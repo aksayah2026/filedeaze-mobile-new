@@ -1,0 +1,257 @@
+import React, { useEffect, useRef } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Pressable,
+  TextInput,
+} from "react-native";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { Shield, Mail, Lock } from "lucide-react-native";
+
+import { useTheme } from "../../theme";
+import { useAuthStore } from "../../store/auth.store";
+import { APP_CONFIG } from "../../config/app.config";
+import { customerLoginSchema, CustomerLoginInput } from "../../validation/auth.validation";
+import { AuthStackParamList } from "../../types/navigation.types";
+import { AppInput } from "../../components/AppInput";
+import { AppButton } from "../../components/AppButton";
+import { AppCard } from "../../components/AppCard";
+
+type NavigationProp = NativeStackNavigationProp<AuthStackParamList, "Login">;
+type RouteProps = RouteProp<AuthStackParamList, "Login">;
+
+export const LoginScreen = () => {
+  const theme = useTheme();
+  const insets = useSafeAreaInsets();
+  const navigation = useNavigation<NavigationProp>();
+  const route = useRoute<RouteProps>();
+  const { login, isLoading, error } = useAuthStore();
+
+  const { email: routeEmail = "", successBanner = false } = route.params || {};
+  const passwordInputRef = useRef<TextInput>(null);
+
+  const {
+    control,
+    handleSubmit,
+    setValue,
+    formState: { errors },
+  } = useForm<CustomerLoginInput>({
+    resolver: zodResolver(customerLoginSchema),
+    defaultValues: {
+      email: routeEmail,
+      password: "",
+    },
+  });
+
+  useEffect(() => {
+    if (routeEmail) {
+      setValue("email", routeEmail);
+    }
+    if (successBanner) {
+      setTimeout(() => {
+        passwordInputRef.current?.focus();
+      }, 300);
+    }
+  }, [routeEmail, successBanner, setValue]);
+
+  const onSubmit = async (data: CustomerLoginInput) => {
+    try {
+      await login(data.email, data.password);
+    } catch {
+      // Error handled by store and displayed via UI
+    }
+  };
+
+  return (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+    >
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContainer,
+          { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 40 },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.headerSection}>
+          {APP_CONFIG.logo ? (
+            <Image source={{ uri: APP_CONFIG.logo }} style={styles.logo} />
+          ) : (
+            <View style={[styles.logoPlaceholder, { backgroundColor: theme.colors.primary }]}>
+              <Shield color="#ffffff" size={36} />
+            </View>
+          )}
+          <Text style={[styles.appName, { color: theme.colors.text, fontSize: theme.typography.fontSize.xxl }]}>
+            {APP_CONFIG.appName}
+          </Text>
+          <Text style={[styles.welcomeText, { color: theme.colors.text, fontSize: theme.typography.fontSize.lg }]}>
+            Welcome Back
+          </Text>
+          <Text style={[styles.tagline, { color: theme.colors.textMuted }]}>
+            Secure Portal login for customers & service technicians
+          </Text>
+        </View>
+
+         <AppCard style={styles.formCard}>
+          {successBanner && (
+            <View style={[styles.successBannerContainer, { backgroundColor: `${theme.colors.success}12`, borderColor: theme.colors.success }]}>
+              <Text style={[styles.successBannerTitle, { color: theme.colors.success }]}>Password Reset Successful</Text>
+              <Text style={[styles.successBannerText, { color: theme.colors.text }]}>Please sign in with your new password.</Text>
+            </View>
+          )}
+
+          {error && (
+            <View style={[styles.errorContainer, { backgroundColor: `${theme.colors.danger}12` }]}>
+              <Text style={[styles.errorText, { color: theme.colors.danger }]}>{error}</Text>
+            </View>
+          )}
+
+          <Controller
+            control={control}
+            name="email"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <AppInput
+                label="Email Address"
+                placeholder="Enter registered email"
+                value={value}
+                onBlur={onBlur}
+                onChangeText={onChange}
+                error={errors.email?.message}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                leftIcon={<Mail size={20} color={theme.colors.textLight} />}
+              />
+            )}
+          />
+
+          <Controller
+            control={control}
+            name="password"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <AppInput
+                ref={passwordInputRef}
+                label="Password"
+                placeholder="Enter password"
+                value={value}
+                onBlur={onBlur}
+                onChangeText={onChange}
+                secureTextEntry
+                error={errors.password?.message}
+                autoCapitalize="none"
+                leftIcon={<Lock size={20} color={theme.colors.textLight} />}
+              />
+            )}
+          />
+
+          <AppButton
+            title="Sign In"
+            onPress={handleSubmit(onSubmit)}
+            loading={isLoading}
+            style={{ marginTop: 16 }}
+          />
+
+          <View style={styles.linksRow}>
+            <Pressable onPress={() => navigation.navigate("ForgotPassword")}>
+              <Text style={[styles.linkText, { color: theme.colors.primary }]}>Forgot Password?</Text>
+            </Pressable>
+            <Pressable onPress={() => navigation.navigate("Register")}>
+              <Text style={[styles.linkText, { color: theme.colors.primary }]}>Create Account</Text>
+            </Pressable>
+          </View>
+        </AppCard>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  scrollContainer: {
+    flexGrow: 1,
+    paddingHorizontal: 24,
+    justifyContent: "center",
+  },
+  headerSection: {
+    alignItems: "center",
+    marginBottom: 28,
+  },
+  logo: {
+    width: 80,
+    height: 80,
+    borderRadius: 20,
+    marginBottom: 14,
+  },
+  logoPlaceholder: {
+    width: 80,
+    height: 80,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 14,
+  },
+  appName: {
+    fontWeight: "800",
+    letterSpacing: -0.5,
+  },
+  welcomeText: {
+    fontWeight: "700",
+    marginTop: 12,
+  },
+  tagline: {
+    fontSize: 13,
+    marginTop: 6,
+    textAlign: "center",
+  },
+  formCard: {
+    width: "100%",
+    padding: 20,
+  },
+  errorContainer: {
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  errorText: {
+    fontSize: 13,
+    fontWeight: "500",
+    textAlign: "center",
+    lineHeight: 18,
+  },
+  successBannerContainer: {
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    marginBottom: 16,
+  },
+  successBannerTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    marginBottom: 2,
+  },
+  successBannerText: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  linksRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 16,
+  },
+  linkText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+});
+export default LoginScreen;
