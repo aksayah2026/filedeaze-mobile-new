@@ -9,3 +9,4 @@ export const APP_CONFIG = {
   apiBaseUrl: devUrl,
   timeoutMs: 15000,
 };
+

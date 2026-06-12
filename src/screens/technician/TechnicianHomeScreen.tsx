@@ -39,6 +39,8 @@ import { AppEmptyState } from "../../components/AppEmptyState";
 import { AppCard } from "../../components/AppCard";
 import { AppBadge } from "../../components/AppBadge";
 import { AppButton } from "../../components/AppButton";
+import { AppConfirmModal } from "../../components/AppConfirmModal";
+import { AppSuccessModal } from "../../components/AppSuccessModal";
 
 type NavigationProp = NativeStackNavigationProp<TechnicianStackParamList, "TechnicianHome">;
 
@@ -54,6 +56,12 @@ export const TechnicianHomeScreen = () => {
 
   const [locationModalVisible, setLocationModalVisible] = useState(false);
   const [locationInput, setLocationInput] = useState("Main Office HQ, Sector 62");
+  const [checkoutModalVisible, setCheckoutModalVisible] = useState(false);
+  const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
+  const [successTitle, setSuccessTitle] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   // Calculate statistics
   const jobsList = Array.isArray(jobs) ? jobs : [];
@@ -89,7 +97,9 @@ export const TechnicianHomeScreen = () => {
       await checkInMutation.mutateAsync({ location: locationInput });
       setLocationModalVisible(false);
       setLocationInput("");
-      Alert.alert("Success", "Attendance checked in successfully.");
+      setSuccessTitle("Success");
+      setSuccessMessage("Attendance checked in successfully.");
+      setSuccessModalVisible(true);
     } catch (err: any) {
       Alert.alert("Error", err.message || "Failed to check in.");
     }
@@ -100,28 +110,19 @@ export const TechnicianHomeScreen = () => {
       Alert.alert("Not Checked In", "You must be checked in to perform checkout.");
       return;
     }
-    Alert.alert(
-      "Confirm Check Out",
-      "Are you sure you want to check out for the day?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Check Out",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              const res = await checkOutMutation.mutateAsync({});
-              Alert.alert(
-                "Checked Out",
-                `Successfully checked out.\nWorking hours today: ${res.workingHours || "N/A"}`
-              );
-            } catch (err: any) {
-              Alert.alert("Error", err.message || "Failed to check out.");
-            }
-          },
-        },
-      ]
-    );
+    setCheckoutModalVisible(true);
+  };
+
+  const handleConfirmCheckOut = async () => {
+    setCheckoutModalVisible(false);
+    try {
+      const res = await checkOutMutation.mutateAsync({});
+      setSuccessTitle("Checked Out");
+      setSuccessMessage(`Successfully checked out.\nWorking hours today: ${res.workingHours || "N/A"}`);
+      setSuccessModalVisible(true);
+    } catch (err: any) {
+      Alert.alert("Error", err.message || "Failed to check out.");
+    }
   };
 
   const getPriorityVariant = (priority: string) => {
@@ -161,7 +162,7 @@ export const TechnicianHomeScreen = () => {
         showTenantBranding
         rightAction={
           <Pressable
-            onPress={logout}
+            onPress={() => setLogoutModalVisible(true)}
             style={({ pressed }) => [styles.logoutButton, pressed && { opacity: 0.7 }]}
           >
             <LogOut color={theme.colors.danger} size={20} />
@@ -450,6 +451,37 @@ export const TechnicianHomeScreen = () => {
           </View>
         </View>
       </Modal>
+
+      <AppConfirmModal
+        visible={checkoutModalVisible}
+        title="Confirm Check Out"
+        message="Are you sure you want to check out for the day?"
+        confirmText="Check Out"
+        onConfirm={handleConfirmCheckOut}
+        onCancel={() => setCheckoutModalVisible(false)}
+        confirmVariant="danger"
+      />
+
+      <AppConfirmModal
+        visible={logoutModalVisible}
+        title="Confirm Log Out"
+        message="Are you sure you want to log out of the application?"
+        confirmText="Log Out"
+        onConfirm={() => {
+          setLogoutModalVisible(false);
+          logout();
+        }}
+        onCancel={() => setLogoutModalVisible(false)}
+        confirmVariant="danger"
+      />
+
+      <AppSuccessModal
+        visible={successModalVisible}
+        title={successTitle}
+        message={successMessage}
+        onClose={() => setSuccessModalVisible(false)}
+        autoCloseDelay={2000}
+      />
     </View>
   );
 };
