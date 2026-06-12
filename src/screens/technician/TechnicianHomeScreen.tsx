@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
   LogOut,
+  LogIn,
   History,
   MapPin,
   ChevronRight,
@@ -22,6 +23,7 @@ import {
   CheckCircle,
   AlertTriangle,
   FileCheck,
+  Timer,
 } from "lucide-react-native";
 
 import { useTheme } from "../../theme";
@@ -62,6 +64,44 @@ export const TechnicianHomeScreen = () => {
   const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [successTitle, setSuccessTitle] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+
+  const [elapsedHours, setElapsedHours] = useState("0h 00m 00s");
+
+  useEffect(() => {
+    let intervalId: any;
+
+    const updateTimer = () => {
+      if (!attendance?.rawCheckInTime) {
+        setElapsedHours("0h 00m 00s");
+        return;
+      }
+      const checkInDate = new Date(attendance.rawCheckInTime);
+      const currentDate = new Date();
+      const diffMs = currentDate.getTime() - checkInDate.getTime();
+      if (diffMs <= 0) {
+        setElapsedHours("0h 00m 00s");
+        return;
+      }
+
+      const totalSecs = Math.floor(diffMs / 1000);
+      const hours = Math.floor(totalSecs / 3600);
+      const mins = Math.floor((totalSecs % 3600) / 60);
+      const secs = totalSecs % 60;
+
+      setElapsedHours(`${hours}h ${String(mins).padStart(2, "0")}m ${String(secs).padStart(2, "0")}s`);
+    };
+
+    if (attendance?.checkedIn && attendance?.rawCheckInTime) {
+      updateTimer();
+      intervalId = setInterval(updateTimer, 1000);
+    } else {
+      setElapsedHours("0h 00m 00s");
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [attendance?.checkedIn, attendance?.rawCheckInTime]);
 
   // Calculate statistics
   const jobsList = Array.isArray(jobs) ? jobs : [];
@@ -113,12 +153,37 @@ export const TechnicianHomeScreen = () => {
     setCheckoutModalVisible(true);
   };
 
+  const getElapsedWorkingHours = () => {
+    if (!attendance?.rawCheckInTime) return "0h 00m";
+    const checkInDate = new Date(attendance.rawCheckInTime);
+    const currentDate = new Date();
+    const diffMs = currentDate.getTime() - checkInDate.getTime();
+    if (diffMs <= 0) return "0h 00m";
+    
+    const totalMins = Math.floor(diffMs / 60000);
+    const hours = Math.floor(totalMins / 60);
+    const mins = totalMins % 60;
+    return `${hours}h ${String(mins).padStart(2, "0")}m`;
+  };
+
   const handleConfirmCheckOut = async () => {
     setCheckoutModalVisible(false);
     try {
-      const res = await checkOutMutation.mutateAsync({});
+      const res: any = await checkOutMutation.mutateAsync({});
+      
+      // Calculate working hours from backend response data
+      let workingHoursStr = "N/A";
+      const attendanceData = res?.data;
+      if (attendanceData?.checkInTime && attendanceData?.checkOutTime) {
+        const diffMs = new Date(attendanceData.checkOutTime).getTime() - new Date(attendanceData.checkInTime).getTime();
+        const totalMins = Math.floor(diffMs / 60000);
+        const h = Math.floor(totalMins / 60);
+        const m = totalMins % 60;
+        workingHoursStr = `${h}h ${String(m).padStart(2, "0")}m`;
+      }
+
       setSuccessTitle("Checked Out");
-      setSuccessMessage(`Successfully checked out.\nWorking hours today: ${res.workingHours || "N/A"}`);
+      setSuccessMessage(`Successfully checked out.\nWorking hours today: ${workingHoursStr}`);
       setSuccessModalVisible(true);
     } catch (err: any) {
       Alert.alert("Error", err.message || "Failed to check out.");
@@ -240,63 +305,121 @@ export const TechnicianHomeScreen = () => {
 
           {attendance?.shiftCompleted ? (
             <View style={styles.attendanceInfo}>
-              <View style={styles.infoRow}>
-                <Clock size={16} color={theme.colors.textMuted} />
-                <Text style={[styles.attendanceInfoText, { color: theme.colors.text }]}>
-                  Checked in at: <Text style={{ fontWeight: "700" }}>{attendance.checkInTime}</Text>
+              <View style={styles.metricsContainer}>
+                <View style={[styles.metricCard, { backgroundColor: `${theme.colors.success}08` }]}>
+                  <LogIn size={16} color={theme.colors.success} />
+                  <Text style={styles.metricLabel}>Check In</Text>
+                  <Text style={[styles.metricValue, { color: theme.colors.text }]}>{attendance.checkInTime}</Text>
+                </View>
+                <View style={[styles.metricCard, { backgroundColor: `${theme.colors.danger}08` }]}>
+                  <LogOut size={16} color={theme.colors.danger} />
+                  <Text style={styles.metricLabel}>Check Out</Text>
+                  <Text style={[styles.metricValue, { color: theme.colors.text }]}>{attendance.checkOutTime}</Text>
+                </View>
+                <View style={[styles.metricCard, { backgroundColor: `${theme.colors.primary}08` }]}>
+                  <Timer size={16} color={theme.colors.primary} />
+                  <Text style={styles.metricLabel}>Duration</Text>
+                  <Text style={[styles.metricValue, { color: theme.colors.text }]}>{attendance.workingHours || "0h 00m"}</Text>
+                </View>
+              </View>
+
+              <View style={[styles.successBanner, { backgroundColor: `${theme.colors.success}10`, borderColor: `${theme.colors.success}20` }]}>
+                <CheckCircle size={18} color={theme.colors.success} />
+                <Text style={[styles.successBannerText, { color: theme.colors.success }]}>
+                  Shift completed successfully today.
                 </Text>
               </View>
-              <View style={styles.infoRow}>
-                <Clock size={16} color={theme.colors.textMuted} />
-                <Text style={[styles.attendanceInfoText, { color: theme.colors.text }]}>
-                  Checked out at: <Text style={{ fontWeight: "700" }}>{attendance.checkOutTime}</Text>
-                </Text>
-              </View>
-              <AppButton
-                title="Shift Completed"
-                onPress={() => { }}
-                variant="secondary"
-                size="sm"
-                disabled
-                style={{ marginTop: 12 }}
-              />
-              {/* CHANGED: Removed duplicate Attendance History link from Shift Completed view */}
             </View>
           ) : attendance?.checkedIn ? (
             <View style={styles.attendanceInfo}>
-              <View style={styles.infoRow}>
-                <Clock size={16} color={theme.colors.textMuted} />
-                <Text style={[styles.attendanceInfoText, { color: theme.colors.text }]}>
-                  Checked in at: <Text style={{ fontWeight: "700" }}>{attendance.checkInTime}</Text>
-                </Text>
+              <View style={styles.activeSessionContainer}>
+                <View style={styles.sessionRow}>
+                  <View style={[styles.iconCircle, { backgroundColor: `${theme.colors.success}10` }]}>
+                    <LogIn size={16} color={theme.colors.success} />
+                  </View>
+                  <View style={styles.sessionDetails}>
+                    <Text style={styles.sessionLabel}>Checked In At</Text>
+                    <Text style={[styles.sessionValue, { color: theme.colors.text }]}>
+                      {attendance.checkInTime}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.sessionRow}>
+                  <View style={[styles.iconCircle, { backgroundColor: `${theme.colors.primary}10` }]}>
+                    <MapPin size={16} color={theme.colors.primary} />
+                  </View>
+                  <View style={styles.sessionDetails}>
+                    <Text style={styles.sessionLabel}>Physical Location</Text>
+                    <Text style={[styles.sessionValue, { color: theme.colors.text }]} numberOfLines={1}>
+                      {attendance.checkInLocation}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.sessionRow}>
+                  <View style={[styles.iconCircle, { backgroundColor: `${theme.colors.warning}10` }]}>
+                    <Timer size={16} color={theme.colors.warning} />
+                  </View>
+                  <View style={styles.sessionDetails}>
+                    <Text style={styles.sessionLabel}>Working Hours Today</Text>
+                    <Text style={[styles.sessionValue, { color: theme.colors.text }]}>
+                      {elapsedHours}
+                    </Text>
+                  </View>
+                </View>
               </View>
-              <View style={styles.infoRow}>
-                <MapPin size={16} color={theme.colors.textMuted} />
-                <Text style={[styles.attendanceInfoText, { color: theme.colors.text }]}>
-                  Location: <Text style={{ fontWeight: "600" }}>{attendance.checkInLocation}</Text>
-                </Text>
-              </View>
+
               <AppButton
                 title="Check Out for the Day"
                 onPress={handleCheckOutSubmit}
                 variant="danger"
-                size="sm"
-                style={{ marginTop: 12 }}
+                icon={<LogOut size={16} color="#ffffff" />}
+                style={{ marginTop: 16 }}
               />
-              {/* CHANGED: Removed duplicate Attendance History link from Active Check-in view */}
             </View>
           ) : (
             <View style={styles.attendanceInfo}>
-              <Text style={{ color: theme.colors.textMuted, fontSize: 13, marginBottom: 12 }}>
-                {attendance?.workingHours
-                  ? `Last session completed: ${attendance.workingHours} (Check out: ${attendance.checkOutTime})`
-                  : "Start your shifts to record working hours, track travel progress, and begin executing dispatched jobs."}
-              </Text>
+              {attendance?.workingHours ? (
+                <View style={styles.metricsContainer}>
+                  <View style={[styles.metricCard, { backgroundColor: `${theme.colors.primary}08` }]}>
+                    <Timer size={16} color={theme.colors.primary} />
+                    <Text style={styles.metricLabel}>Prev Hours</Text>
+                    <Text style={[styles.metricValue, { color: theme.colors.text }]}>{attendance.workingHours}</Text>
+                  </View>
+                  <View style={[styles.metricCard, { backgroundColor: `${theme.colors.secondary}08` }]}>
+                    <LogOut size={16} color={theme.colors.textMuted} />
+                    <Text style={styles.metricLabel}>Prev Ended</Text>
+                    <Text style={[styles.metricValue, { color: theme.colors.text }]}>{attendance.checkOutTime}</Text>
+                  </View>
+                </View>
+              ) : (
+                <View style={[styles.notCheckedInContainer, { backgroundColor: `${theme.colors.primary}05`, borderColor: `${theme.colors.primary}12` }]}>
+                  <Text style={[styles.notCheckedInTitle, { color: theme.colors.text }]}>
+                    Ready to start your shift?
+                  </Text>
+                  <View style={styles.benefitList}>
+                    <View style={styles.benefitRow}>
+                      <Clock size={16} color={theme.colors.primary} />
+                      <Text style={[styles.benefitText, { color: theme.colors.textMuted }]}>
+                        Record your daily working hours
+                      </Text>
+                    </View>
+                    <View style={styles.benefitRow}>
+                      <CheckCircle size={16} color={theme.colors.primary} />
+                      <Text style={[styles.benefitText, { color: theme.colors.textMuted }]}>
+                        Access your dispatched tickets
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              )}
               <AppButton
                 title="Perform Check In"
                 onPress={handleCheckInPress}
                 variant="primary"
-                size="sm"
+                icon={<LogIn size={16} color="#ffffff" />}
+                style={{ marginTop: 8 }}
               />
             </View>
           )}
@@ -407,25 +530,32 @@ export const TechnicianHomeScreen = () => {
       </ScrollView>
 
       {/* Location Check-In Modal */}
-      <Modal visible={locationModalVisible} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: theme.colors.card }]}>
+      <Modal visible={locationModalVisible} transparent animationType="slide" onRequestClose={() => setLocationModalVisible(false)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setLocationModalVisible(false)}>
+          <Pressable
+            style={[styles.premiumModalCard, { backgroundColor: theme.colors.card }]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={[styles.premiumIconContainer, { backgroundColor: `${theme.colors.primary}15` }]}>
+              <MapPin size={28} color={theme.colors.primary} />
+            </View>
+
             <Text
               style={[
-                styles.modalTitle,
-                { color: theme.colors.text, fontSize: theme.typography.fontSize.md, fontWeight: "700" },
+                styles.premiumModalTitle,
+                { color: theme.colors.text, fontSize: 18, fontWeight: "700" },
               ]}
             >
               Verify Check-In Location
             </Text>
-            <Text style={{ color: theme.colors.textMuted, fontSize: 13, marginBottom: 16 }}>
+            <Text style={[styles.premiumModalMessage, { color: theme.colors.textMuted }]}>
               Please enter or confirm your current physical dispatch location:
             </Text>
             <TextInput
               value={locationInput}
               onChangeText={setLocationInput}
               style={[
-                styles.locationInput,
+                styles.premiumLocationInput,
                 {
                   borderColor: theme.colors.border,
                   color: theme.colors.text,
@@ -433,29 +563,31 @@ export const TechnicianHomeScreen = () => {
                 },
               ]}
               placeholder="e.g. Noida Sector 62 Office"
+              placeholderTextColor={theme.colors.textLight}
             />
-            <View style={styles.modalButtons}>
-              <Pressable
+            <View style={styles.premiumButtonRow}>
+              <AppButton
+                title="Cancel"
+                variant="ghost"
                 onPress={() => setLocationModalVisible(false)}
-                style={[styles.modalBtn, { backgroundColor: theme.colors.borderLight }]}
-              >
-                <Text style={{ color: theme.colors.text, fontWeight: "600" }}>Cancel</Text>
-              </Pressable>
-              <Pressable
+                style={styles.premiumBtn}
+                textStyle={{ color: theme.colors.textMuted }}
+              />
+              <AppButton
+                title="Check In"
+                variant="primary"
                 onPress={handleCheckInSubmit}
-                style={[styles.modalBtn, { backgroundColor: theme.colors.primary }]}
-              >
-                <Text style={{ color: "#ffffff", fontWeight: "700" }}>Check In</Text>
-              </Pressable>
+                style={styles.premiumBtn}
+              />
             </View>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
 
       <AppConfirmModal
         visible={checkoutModalVisible}
         title="Confirm Check Out"
-        message="Are you sure you want to check out for the day?"
+        message={`Are you sure you want to check out for the day?\n\nWorking hours logged so far: ${getElapsedWorkingHours()}`}
         confirmText="Check Out"
         onConfirm={handleConfirmCheckOut}
         onCancel={() => setCheckoutModalVisible(false)}
@@ -538,13 +670,13 @@ const styles = StyleSheet.create({
     paddingTop: 4,
   },
   attendanceInfoText: {
-    fontSize: 13,
+    fontSize: 14,
   },
   infoRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    marginBottom: 8,
+    gap: 10,
+    marginBottom: 10,
   },
   sectionTitle: {
     fontSize: 11,
@@ -640,6 +772,7 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     justifyContent: "center",
+    alignItems: "center",
     backgroundColor: "rgba(0,0,0,0.5)",
     padding: 24,
   },
@@ -672,5 +805,173 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
+  },
+  premiumModalCard: {
+    width: "100%",
+    maxWidth: 320,
+    borderRadius: 20,
+    padding: 24,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    elevation: 8,
+  },
+  premiumIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  premiumModalTitle: {
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  premiumModalMessage: {
+    fontSize: 14,
+    textAlign: "center",
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  premiumLocationInput: {
+    width: "100%",
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    marginBottom: 20,
+  },
+  premiumButtonRow: {
+    flexDirection: "row",
+    gap: 12,
+    width: "100%",
+  },
+  premiumBtn: {
+    flex: 1,
+  },
+  prevShiftSummary: {
+    marginBottom: 8,
+  },
+  prevShiftTitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  prevShiftRow: {
+    flexDirection: "row",
+    gap: 16,
+  },
+  prevShiftDetail: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  prevShiftText: {
+    fontSize: 13,
+  },
+  metricsContainer: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 16,
+  },
+  metricCard: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.02)",
+  },
+  metricLabel: {
+    fontSize: 10,
+    color: "#64748b",
+    textTransform: "uppercase",
+    fontWeight: "600",
+    marginTop: 6,
+    marginBottom: 2,
+  },
+  metricValue: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  successBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  successBannerText: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  activeSessionContainer: {
+    gap: 12,
+    marginBottom: 8,
+  },
+  sessionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  iconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sessionDetails: {
+    flex: 1,
+  },
+  sessionLabel: {
+    fontSize: 11,
+    color: "#64748b",
+    textTransform: "uppercase",
+    fontWeight: "600",
+  },
+  sessionValue: {
+    fontSize: 14,
+    fontWeight: "700",
+    marginTop: 2,
+  },
+  notCheckedInAlert: {
+    marginBottom: 12,
+    padding: 4,
+  },
+  notCheckedInText: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  notCheckedInContainer: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  notCheckedInTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    marginBottom: 12,
+  },
+  benefitList: {
+    gap: 10,
+  },
+  benefitRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  benefitText: {
+    fontSize: 13,
+    lineHeight: 18,
   },
 });

@@ -62,6 +62,7 @@ export interface AttendanceLog {
   checkOutTime?: string;
   workingHours?: string;
   shiftCompleted?: boolean;
+  rawCheckInTime?: string;
 }
 
 export interface AttendanceRecord {
@@ -342,6 +343,15 @@ export class JobService {
     const hasCheckedIn = !!dashboard.checkInTime;
     const hasCheckedOut = !!dashboard.checkOutTime;
 
+    let workingHours: string | undefined = undefined;
+    if (dashboard.checkInTime && dashboard.checkOutTime) {
+      const diffMs = new Date(dashboard.checkOutTime).getTime() - new Date(dashboard.checkInTime).getTime();
+      const totalMins = Math.floor(diffMs / 60000);
+      const h = Math.floor(totalMins / 60);
+      const m = totalMins % 60;
+      workingHours = `${h}h ${String(m).padStart(2, "0")}m`;
+    }
+
     return {
       checkedIn: dashboard.isCheckedIn === true && !hasCheckedOut,
       checkInTime: dashboard.checkInTime
@@ -360,6 +370,8 @@ export class JobService {
         : undefined,
       checkInLocation: "Main Office HQ, Sector 62",
       shiftCompleted: hasCheckedIn && hasCheckedOut,
+      rawCheckInTime: dashboard.checkInTime ?? undefined,
+      workingHours,
     };
   }
 
