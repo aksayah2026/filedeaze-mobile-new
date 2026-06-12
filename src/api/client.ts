@@ -16,7 +16,7 @@ export const apiClient = axios.create({
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     // Get state from Zustand store
-    const { token, tenantCode } = useAuthStore.getState();
+    const { token } = useAuthStore.getState();
 
     // Attach Tenant identifier header
     config.headers["x-tenant-code"] = APP_CONFIG.tenantCode;

@@ -14,7 +14,7 @@ import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
   LogOut,
-  Calendar,
+  History,
   MapPin,
   ChevronRight,
   User,
@@ -56,21 +56,39 @@ export const TechnicianHomeScreen = () => {
   const [locationInput, setLocationInput] = useState("Main Office HQ, Sector 62");
 
   // Calculate statistics
-  const assignedCount = jobs.filter((j) => j.status === "ASSIGNED" || j.status === "NEW").length;
-  const inProgressCount = jobs.filter(
+  const jobsList = Array.isArray(jobs) ? jobs : [];
+  const assignedCount = jobsList.filter((j) => j.status === "ASSIGNED" || j.status === "NEW").length;
+  const inProgressCount = jobsList.filter(
     (j) => j.status === "IN_PROGRESS" || j.status === "ACCEPTED" || j.status === "TRAVELLING" || j.status === "REACHED"
   ).length;
-  const pendingCount = jobs.filter((j) => j.status === "PENDING" || j.status === "RESCHEDULED").length;
-  const completedCount = jobs.filter((j) => j.status === "COMPLETED" || j.status === "CLOSED").length;
+  const pendingCount = jobsList.filter((j) => j.status === "PENDING" || j.status === "RESCHEDULED").length;
+  const completedCount = jobsList.filter((j) => j.status === "COMPLETED" || j.status === "CLOSED").length;
+
+  const handleCheckInPress = () => {
+    if (attendance?.shiftCompleted) {
+      Alert.alert("Shift Completed", "Your shift for today has already been completed.");
+      return;
+    }
+    if (attendance?.checkedIn) {
+      Alert.alert("Already Checked In", "You are already checked in today.");
+      return;
+    }
+    setLocationModalVisible(true);
+  };
 
   const handleCheckInSubmit = async () => {
+    if (attendance?.shiftCompleted) {
+      Alert.alert("Shift Completed", "Your shift for today has already been completed.");
+      return;
+    }
     if (!locationInput.trim()) {
       Alert.alert("Required", "Please enter your check-in location.");
       return;
     }
     try {
-      await checkInMutation.mutateAsync(locationInput);
+      await checkInMutation.mutateAsync({ location: locationInput });
       setLocationModalVisible(false);
+      setLocationInput("");
       Alert.alert("Success", "Attendance checked in successfully.");
     } catch (err: any) {
       Alert.alert("Error", err.message || "Failed to check in.");
@@ -78,6 +96,10 @@ export const TechnicianHomeScreen = () => {
   };
 
   const handleCheckOutSubmit = async () => {
+    if (!attendance?.checkedIn) {
+      Alert.alert("Not Checked In", "You must be checked in to perform checkout.");
+      return;
+    }
     Alert.alert(
       "Confirm Check Out",
       "Are you sure you want to check out for the day?",
@@ -88,10 +110,10 @@ export const TechnicianHomeScreen = () => {
           style: "destructive",
           onPress: async () => {
             try {
-              const res = await checkOutMutation.mutateAsync();
+              const res = await checkOutMutation.mutateAsync({});
               Alert.alert(
                 "Checked Out",
-                `Successfully checked out.\nWorking hours today: ${res.workingHours}`
+                `Successfully checked out.\nWorking hours today: ${res.workingHours || "N/A"}`
               );
             } catch (err: any) {
               Alert.alert("Error", err.message || "Failed to check out.");
@@ -178,6 +200,19 @@ export const TechnicianHomeScreen = () => {
             {user?.name} ({user?.mobile})
           </Text>
         </View>
+        <Pressable
+          onPress={() => navigation.navigate("AttendanceHistory")}
+          style={({ pressed }) => [
+            {
+              padding: 8,
+              borderRadius: 8,
+              backgroundColor: `${theme.colors.primary}12`,
+            },
+            pressed && { opacity: 0.7 },
+          ]}
+        >
+          <History color={theme.colors.primary} size={20} />
+        </Pressable>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -193,14 +228,40 @@ export const TechnicianHomeScreen = () => {
             >
               ATTENDANCE TRACKING
             </Text>
-            {attendance?.checkedIn ? (
+            {attendance?.shiftCompleted ? (
+              <AppBadge label="Shift Completed" variant="success" />
+            ) : attendance?.checkedIn ? (
               <AppBadge label="Active Check-in" variant="success" />
             ) : (
               <AppBadge label="Not Checked In" variant="secondary" />
             )}
           </View>
 
-          {attendance?.checkedIn ? (
+          {attendance?.shiftCompleted ? (
+            <View style={styles.attendanceInfo}>
+              <View style={styles.infoRow}>
+                <Clock size={16} color={theme.colors.textMuted} />
+                <Text style={[styles.attendanceInfoText, { color: theme.colors.text }]}>
+                  Checked in at: <Text style={{ fontWeight: "700" }}>{attendance.checkInTime}</Text>
+                </Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Clock size={16} color={theme.colors.textMuted} />
+                <Text style={[styles.attendanceInfoText, { color: theme.colors.text }]}>
+                  Checked out at: <Text style={{ fontWeight: "700" }}>{attendance.checkOutTime}</Text>
+                </Text>
+              </View>
+              <AppButton
+                title="Shift Completed"
+                onPress={() => { }}
+                variant="secondary"
+                size="sm"
+                disabled
+                style={{ marginTop: 12 }}
+              />
+              {/* CHANGED: Removed duplicate Attendance History link from Shift Completed view */}
+            </View>
+          ) : attendance?.checkedIn ? (
             <View style={styles.attendanceInfo}>
               <View style={styles.infoRow}>
                 <Clock size={16} color={theme.colors.textMuted} />
@@ -221,6 +282,7 @@ export const TechnicianHomeScreen = () => {
                 size="sm"
                 style={{ marginTop: 12 }}
               />
+              {/* CHANGED: Removed duplicate Attendance History link from Active Check-in view */}
             </View>
           ) : (
             <View style={styles.attendanceInfo}>
@@ -231,7 +293,7 @@ export const TechnicianHomeScreen = () => {
               </Text>
               <AppButton
                 title="Perform Check In"
-                onPress={() => setLocationModalVisible(true)}
+                onPress={handleCheckInPress}
                 variant="primary"
                 size="sm"
               />
@@ -265,20 +327,25 @@ export const TechnicianHomeScreen = () => {
           <Text style={[styles.sectionTitle, { color: theme.colors.textMuted, marginVertical: 0 }]}>
             Dispatched Tickets
           </Text>
-          <Pressable onPress={refetch}>
-            <Text style={{ fontSize: 12, color: theme.colors.primary, fontWeight: "700" }}>Refresh</Text>
-          </Pressable>
+          <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
+            <Pressable onPress={() => navigation.navigate("AssignedJobs")}>
+              <Text style={{ fontSize: 12, color: theme.colors.primary, fontWeight: "700" }}>View All</Text>
+            </Pressable>
+            <Pressable onPress={() => refetch()}>
+              <Text style={{ fontSize: 12, color: theme.colors.textMuted, fontWeight: "600" }}>Refresh</Text>
+            </Pressable>
+          </View>
         </View>
 
         {isJobsLoading ? (
           <AppLoader message="Loading assigned jobs..." />
-        ) : jobs.length === 0 ? (
+        ) : jobsList.length === 0 ? (
           <AppEmptyState
             title="No Assigned Jobs"
             description="You have no tickets currently dispatched to you today."
           />
         ) : (
-          jobs.map((item) => (
+          jobsList.map((item) => (
             <AppCard
               key={item.ticketNo}
               onPress={() => navigation.navigate("TechnicianJobDetails", { jobId: item.ticketNo })}
@@ -309,7 +376,7 @@ export const TechnicianHomeScreen = () => {
               </Text>
 
               <View style={styles.infoLine}>
-                <Calendar size={14} color={theme.colors.textMuted} style={styles.infoIcon} />
+                <History size={14} color={theme.colors.textMuted} style={styles.infoIcon} />
                 <Text style={[styles.infoText, { color: theme.colors.textMuted }]}>
                   {item.scheduledDate} | {item.scheduledTime}
                 </Text>

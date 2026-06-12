@@ -48,6 +48,7 @@ export class AuthService {
         });
 
         const { user, tokens } = response.data.data;
+        console.log("LOGIN SUCCESS ONLY - no attendance started");
         return {
           success: true,
           token: tokens.accessToken,

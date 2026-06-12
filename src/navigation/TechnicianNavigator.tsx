@@ -3,6 +3,19 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { TechnicianStackParamList } from "../types/navigation.types";
 import { TechnicianHomeScreen } from "../screens/technician/TechnicianHomeScreen";
 import { TechnicianJobDetailsScreen } from "../screens/technician/TechnicianJobDetailsScreen";
+import { AttendanceHistoryScreen } from "../screens/technician/AttendanceHistoryScreen";
+import { AssignedJobsScreen } from "../screens/technician/AssignedJobsScreen";
+// Batch 2
+import { AcceptTicketScreen } from "../screens/technician/AcceptTicketScreen";
+import { RejectTicketScreen } from "../screens/technician/RejectTicketScreen";
+import { ReachLocationScreen } from "../screens/technician/ReachLocationScreen";
+// Batch 3
+import { StartJobScreen } from "../screens/technician/StartJobScreen";
+import { MarkPendingScreen } from "../screens/technician/MarkPendingScreen";
+// Batch 4
+import { CompleteJobScreen } from "../screens/technician/CompleteJobScreen";
+import { CustomerSignatureScreen } from "../screens/technician/CustomerSignatureScreen";
+import { PaymentCollectionScreen } from "../screens/technician/PaymentCollectionScreen";
 
 const Stack = createNativeStackNavigator<TechnicianStackParamList>();
 
@@ -16,6 +29,19 @@ export const TechnicianNavigator = () => {
     >
       <Stack.Screen name="TechnicianHome" component={TechnicianHomeScreen} />
       <Stack.Screen name="TechnicianJobDetails" component={TechnicianJobDetailsScreen} />
+      <Stack.Screen name="AttendanceHistory" component={AttendanceHistoryScreen} />
+      <Stack.Screen name="AssignedJobs" component={AssignedJobsScreen} />
+      {/* Batch 2 */}
+      <Stack.Screen name="AcceptTicket" component={AcceptTicketScreen} />
+      <Stack.Screen name="RejectTicket" component={RejectTicketScreen} />
+      <Stack.Screen name="ReachLocation" component={ReachLocationScreen} />
+      {/* Batch 3 */}
+      <Stack.Screen name="StartJob" component={StartJobScreen} />
+      <Stack.Screen name="MarkPending" component={MarkPendingScreen} />
+      {/* Batch 4 */}
+      <Stack.Screen name="CompleteJob" component={CompleteJobScreen} />
+      <Stack.Screen name="CustomerSignature" component={CustomerSignatureScreen} />
+      <Stack.Screen name="PaymentCollection" component={PaymentCollectionScreen} />
     </Stack.Navigator>
   );
 };

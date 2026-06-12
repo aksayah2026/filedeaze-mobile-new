@@ -296,15 +296,25 @@ export const TechnicianJobDetailsScreen = () => {
             <View style={styles.btnRow}>
               <AppButton
                 title="Reject"
-                onPress={handleReject}
+                onPress={() =>
+                  navigation.navigate("RejectTicket", {
+                    jobId: jobId,
+                    ticketNo: job.ticketNo,
+                  })
+                }
                 variant="outline"
                 style={{ flex: 1, borderColor: theme.colors.danger }}
                 textStyle={{ color: theme.colors.danger }}
               />
               <AppButton
                 title="Accept Job"
-                onPress={() => handleStatusChange("ACCEPTED")}
-                loading={updateStatusMutation.isPending}
+                onPress={() =>
+                  navigation.navigate("AcceptTicket", {
+                    jobId: jobId,
+                    ticketNo: job.ticketNo,
+                    customerName: job.customerName,
+                  })
+                }
                 style={{ flex: 1.5 }}
               />
             </View>
@@ -312,7 +322,7 @@ export const TechnicianJobDetailsScreen = () => {
 
           {job.status === "ACCEPTED" && (
             <AppButton
-              title="Start Travel"
+              title="Start Travel to Location"
               onPress={() => handleStatusChange("TRAVELLING")}
               loading={updateStatusMutation.isPending}
             />
@@ -320,8 +330,14 @@ export const TechnicianJobDetailsScreen = () => {
 
           {job.status === "TRAVELLING" && (
             <AppButton
-              title="Reached Customer Location"
-              onPress={() => handleStatusChange("REACHED")}
+              title="Mark as Reached"
+              onPress={() =>
+                navigation.navigate("ReachLocation", {
+                  jobId: jobId,
+                  ticketNo: job.ticketNo,
+                  address: job.address,
+                })
+              }
               loading={updateStatusMutation.isPending}
             />
           )}
@@ -329,7 +345,12 @@ export const TechnicianJobDetailsScreen = () => {
           {job.status === "REACHED" && (
             <AppButton
               title="Start Work"
-              onPress={() => handleStatusChange("IN_PROGRESS")}
+              onPress={() =>
+                navigation.navigate("StartJob", {
+                  jobId: jobId,
+                  ticketNo: job.ticketNo,
+                })
+              }
               loading={updateStatusMutation.isPending}
             />
           )}
@@ -338,19 +359,24 @@ export const TechnicianJobDetailsScreen = () => {
             <View style={styles.btnRow}>
               <AppButton
                 title="Mark Pending"
-                onPress={() => {
-                  setCompleteFormVisible(false);
-                  setPendingFormVisible(true);
-                }}
+                onPress={() =>
+                  navigation.navigate("MarkPending", {
+                    jobId: jobId,
+                    ticketNo: job.ticketNo,
+                  })
+                }
                 variant="outline"
                 style={{ flex: 1 }}
               />
               <AppButton
                 title="Complete Job"
-                onPress={() => {
-                  setPendingFormVisible(false);
-                  setCompleteFormVisible(true);
-                }}
+                onPress={() =>
+                  navigation.navigate("CompleteJob", {
+                    jobId: jobId,
+                    ticketNo: job.ticketNo,
+                    customerName: job.customerName,
+                  })
+                }
                 variant="success"
                 style={{ flex: 1.5 }}
               />

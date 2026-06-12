@@ -6,6 +6,7 @@ import {
   StyleSheet,
   ViewStyle,
   TextStyle,
+  StyleProp,
   Pressable,
 } from "react-native";
 import { useTheme } from "../theme";
@@ -13,12 +14,12 @@ import { useTheme } from "../theme";
 interface AppButtonProps {
   title: string;
   onPress: () => void;
-  variant?: "primary" | "secondary" | "success" | "danger" | "outline" | "ghost";
+  variant?: "primary" | "secondary" | "success" | "warning" | "danger" | "outline" | "ghost";
   size?: "sm" | "md" | "lg";
   loading?: boolean;
   disabled?: boolean;
-  style?: ViewStyle;
-  textStyle?: TextStyle;
+  style?: StyleProp<ViewStyle>;
+  textStyle?: StyleProp<TextStyle>;
   icon?: React.ReactNode;
 }
 
@@ -63,6 +64,9 @@ export const AppButton: React.FC<AppButtonProps> = ({
         break;
       case "success":
         backgroundColor = theme.colors.success;
+        break;
+      case "warning":
+        backgroundColor = theme.colors.warning;
         break;
       case "danger":
         backgroundColor = theme.colors.danger;
