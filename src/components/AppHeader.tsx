@@ -48,9 +48,9 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           >
             <ArrowLeft color={theme.colors.text} size={24} />
           </Pressable>
-        ) : showTenantBranding && APP_CONFIG.logo ? (
+        ) : showTenantBranding && (APP_CONFIG as any).logo ? (
           <Image
-            source={{ uri: APP_CONFIG.logo }}
+            source={{ uri: (APP_CONFIG as any).logo }}
             style={[styles.logo, { borderColor: theme.colors.borderLight }]}
           />
         ) : null}

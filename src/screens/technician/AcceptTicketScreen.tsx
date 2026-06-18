@@ -1,23 +1,39 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   Alert,
+  Image,
 } from "react-native";
 import { useRoute, useNavigation, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { CheckCircle2, User, Briefcase, AlertCircle } from "lucide-react-native";
+import {
+  CheckCircle2,
+  User,
+  Briefcase,
+  AlertCircle,
+  XCircle,
+  Phone,
+  Mail,
+  Tag,
+  Calendar,
+  MapPin,
+  PhoneCall,
+  Clock,
+} from "lucide-react-native";
 
 import { useTheme } from "../../theme";
 import { TechnicianStackParamList } from "../../types/navigation.types";
-import { useUpdateJobStatus, useJobDetails } from "../../hooks/useJobs";
+import { useUpdateJobStatus, useJobDetails, useTechnicianJobs } from "../../hooks/useJobs";
 import { AppHeader } from "../../components/AppHeader";
 import { AppCard } from "../../components/AppCard";
 import { AppBadge } from "../../components/AppBadge";
 import { AppButton } from "../../components/AppButton";
 import { AppLoader } from "../../components/AppLoader";
+import { AppConfirmModal } from "../../components/AppConfirmModal";
+import { AppSuccessModal } from "../../components/AppSuccessModal";
 
 type RouteProps = RouteProp<TechnicianStackParamList, "AcceptTicket">;
 type NavigationProp = NativeStackNavigationProp<TechnicianStackParamList, "AcceptTicket">;
@@ -28,32 +44,56 @@ export const AcceptTicketScreen = () => {
   const navigation = useNavigation<NavigationProp>();
   const { jobId, ticketNo, customerName } = route.params;
 
+  const [acceptModalVisible, setAcceptModalVisible] = useState(false);
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
+
   const { data: job, isLoading } = useJobDetails(jobId);
+  const { data: allJobs = [] } = useTechnicianJobs();
   const acceptMutation = useUpdateJobStatus();
 
-  const handleAccept = async () => {
-    Alert.alert(
-      "Confirm Acceptance",
-      `Are you ready to accept ticket ${ticketNo} for ${customerName}?`,
-      [
-        { text: "Not Yet", style: "cancel" },
-        {
-          text: "Yes, Accept",
-          onPress: async () => {
-            try {
-              await acceptMutation.mutateAsync({ ticketNo: jobId, status: "ACCEPTED" });
-              Alert.alert(
-                "Job Accepted ✓",
-                `You have accepted ticket ${ticketNo}. It is now active in your job list.`,
-                [{ text: "OK", onPress: () => navigation.navigate("TechnicianHome") }]
-              );
-            } catch (err: any) {
-              Alert.alert("Error", err.message || "Failed to accept job.");
-            }
-          },
-        },
-      ]
+  const handleConfirmAccept = async () => {
+    setAcceptModalVisible(false);
+
+    // 1. Check if the technician already has another active job
+    const hasActiveJob = Array.isArray(allJobs) && allJobs.some(
+      (j) => j.id !== jobId && ["ACCEPTED", "TRAVELLING", "REACHED", "IN_PROGRESS"].includes(j.status)
     );
+    if (hasActiveJob) {
+      Alert.alert(
+        "Active Job Pending",
+        "You can only accept one job at a time. Please complete your current active job first."
+      );
+      return;
+    }
+
+    // 2. Check if the scheduled date matches today's date
+    const getTodayStr = () => {
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    };
+    const todayStr = getTodayStr();
+    if (job?.scheduledDateRaw !== todayStr) {
+      Alert.alert(
+        "Date Mismatch",
+        "You can only accept jobs scheduled for today."
+      );
+      return;
+    }
+
+    try {
+      await acceptMutation.mutateAsync({ ticketId: jobId, status: "ACCEPTED" });
+      setSuccessModalVisible(true);
+    } catch (err: any) {
+      Alert.alert("Error", err.message || "Failed to accept job.");
+    }
+  };
+
+  const handleSuccessClose = () => {
+    setSuccessModalVisible(false);
+    navigation.navigate("TechnicianHome");
   };
 
   if (isLoading) {
@@ -61,7 +101,7 @@ export const AcceptTicketScreen = () => {
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader
           title="Accept Job"
-          showBack
+          showBack={true}
           onBackPress={() => navigation.goBack()}
         />
         <AppLoader message="Loading ticket..." />
@@ -74,7 +114,7 @@ export const AcceptTicketScreen = () => {
       <AppHeader
         title="Accept Job"
         subtitle={ticketNo}
-        showBack
+        showBack={true}
         onBackPress={() => navigation.goBack()}
       />
 
@@ -98,18 +138,6 @@ export const AcceptTicketScreen = () => {
         <AppCard style={styles.card}>
           <View style={styles.cardHeader}>
             <Text style={[styles.ticketNo, { color: theme.colors.textMuted }]}>{ticketNo}</Text>
-            {job?.priority && (
-              <AppBadge
-                label={job.priority}
-                variant={
-                  job.priority === "URGENT"
-                    ? "danger"
-                    : job.priority === "HIGH"
-                    ? "warning"
-                    : "primary"
-                }
-              />
-            )}
           </View>
 
           <Text
@@ -129,16 +157,22 @@ export const AcceptTicketScreen = () => {
           </Text>
         </AppCard>
 
-        {/* Client Details */}
-        <Text style={[styles.sectionLabel, { color: theme.colors.textMuted }]}>Client</Text>
+        {/* Customer Details Card */}
+        <Text style={[styles.sectionLabel, { color: theme.colors.textMuted }]}>Customer Details</Text>
         <AppCard style={styles.card}>
+          <Text style={[styles.customerNameTitle, { color: theme.colors.text, fontWeight: "600", fontSize: 16, marginBottom: 12 }]}>
+            {job?.customerName || customerName}
+          </Text>
+
           <View style={styles.infoRow}>
             <View style={[styles.iconBox, { backgroundColor: `${theme.colors.primary}12` }]}>
-              <User size={18} color={theme.colors.primary} />
+              <MapPin size={18} color={theme.colors.primary} />
             </View>
-            <View>
-              <Text style={[styles.infoLabel, { color: theme.colors.textMuted }]}>Customer</Text>
-              <Text style={[styles.infoValue, { color: theme.colors.text }]}>{customerName}</Text>
+            <View style={styles.infoTextContainer}>
+              <Text style={[styles.infoLabel, { color: theme.colors.textMuted }]}>Service Address</Text>
+              <Text style={[styles.infoValue, { color: theme.colors.text }]}>
+                {job?.address || "—"}
+              </Text>
             </View>
           </View>
 
@@ -146,14 +180,62 @@ export const AcceptTicketScreen = () => {
 
           <View style={styles.infoRow}>
             <View style={[styles.iconBox, { backgroundColor: `${theme.colors.success}12` }]}>
-              <Briefcase size={18} color={theme.colors.success} />
+              <Phone size={18} color={theme.colors.success} />
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.infoLabel, { color: theme.colors.textMuted }]}>
-                Scheduled Date & Time
-              </Text>
+            <View style={styles.infoTextContainer}>
+              <Text style={[styles.infoLabel, { color: theme.colors.textMuted }]}>Mobile Phone</Text>
               <Text style={[styles.infoValue, { color: theme.colors.text }]}>
-                {job?.scheduledDate} · {job?.scheduledTime}
+                {job?.customerMobile || "—"}
+              </Text>
+            </View>
+          </View>
+
+          {!!job?.customerAlternatePhone && (
+            <>
+              <View style={[styles.divider, { backgroundColor: theme.colors.borderLight }]} />
+              <View style={styles.infoRow}>
+                <View style={[styles.iconBox, { backgroundColor: `#f59e0b12` }]}>
+                  <PhoneCall size={18} color="#f59e0b" />
+                </View>
+                <View style={styles.infoTextContainer}>
+                  <Text style={[styles.infoLabel, { color: theme.colors.textMuted }]}>Alternate Phone</Text>
+                  <Text style={[styles.infoValue, { color: theme.colors.text }]}>
+                    {job.customerAlternatePhone}
+                  </Text>
+                </View>
+              </View>
+            </>
+          )}
+
+          {!!job?.customerEmail && (
+            <>
+              <View style={[styles.divider, { backgroundColor: theme.colors.borderLight }]} />
+              <View style={styles.infoRow}>
+                <View style={[styles.iconBox, { backgroundColor: `#8b5cf612` }]}>
+                  <Mail size={18} color="#8b5cf6" />
+                </View>
+                <View style={styles.infoTextContainer}>
+                  <Text style={[styles.infoLabel, { color: theme.colors.textMuted }]}>Email Address</Text>
+                  <Text style={[styles.infoValue, { color: theme.colors.text }]}>
+                    {job.customerEmail}
+                  </Text>
+                </View>
+              </View>
+            </>
+          )}
+        </AppCard>
+
+        {/* Service Schedule Card */}
+        <Text style={[styles.sectionLabel, { color: theme.colors.textMuted }]}>Service Schedule</Text>
+        <AppCard style={styles.card}>
+          <View style={styles.infoRow}>
+            <View style={[styles.iconBox, { backgroundColor: `${theme.colors.success}12` }]}>
+              <Calendar size={18} color={theme.colors.success} />
+            </View>
+            <View style={styles.infoTextContainer}>
+              <Text style={[styles.infoLabel, { color: theme.colors.textMuted }]}>Scheduled Time</Text>
+              <Text style={[styles.infoValue, { color: theme.colors.text }]}>
+                {job?.scheduledDate || "—"} | {job?.scheduledTime || "—"}
               </Text>
             </View>
           </View>
@@ -161,35 +243,79 @@ export const AcceptTicketScreen = () => {
           <View style={[styles.divider, { backgroundColor: theme.colors.borderLight }]} />
 
           <View style={styles.infoRow}>
-            <View style={[styles.iconBox, { backgroundColor: `${theme.colors.warning}12` }]}>
-              <Briefcase size={18} color={theme.colors.warning} />
+            <View style={[styles.iconBox, { backgroundColor: `${theme.colors.primary}12` }]}>
+              <Tag size={18} color={theme.colors.primary} />
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.infoLabel, { color: theme.colors.textMuted }]}>Address</Text>
-              <Text style={[styles.infoValue, { color: theme.colors.text }]}>{job?.address}</Text>
+            <View style={styles.infoTextContainer}>
+              <Text style={[styles.infoLabel, { color: theme.colors.textMuted }]}>Category</Text>
+              <Text style={[styles.infoValue, { color: theme.colors.text }]}>
+                {job?.category || "—"}
+              </Text>
             </View>
           </View>
         </AppCard>
 
-        {/* Actions */}
-        <View style={styles.actions}>
+        {/* Customer Attached Images */}
+        {job?.images && job.images.length > 0 && (
+          <>
+            <Text style={[styles.sectionLabel, { color: theme.colors.textMuted }]}>Attached Images</Text>
+            <View style={styles.imageGrid}>
+              {job.images.map((imgUrl, index) => (
+                <Image
+                  key={index}
+                  source={{ uri: imgUrl }}
+                  style={styles.attachedImage}
+                />
+              ))}
+            </View>
+          </>
+        )}
+      </ScrollView>
+
+      {/* Sticky Action Footer */}
+      <View style={[styles.stickyFooter, { backgroundColor: theme.colors.card, borderTopColor: theme.colors.borderLight }]}>
+        <View style={styles.actionsRow}>
           <AppButton
-            title="Accept This Job"
-            onPress={handleAccept}
+            title="Reject Job"
+            onPress={() => navigation.navigate("RejectTicket", { jobId, ticketNo })}
+            variant="danger"
+            size="lg"
+            icon={<XCircle size={18} color="#ffffff" />}
+            style={styles.rejectBtn}
+          />
+          <AppButton
+            title="Accept Job"
+            onPress={() => setAcceptModalVisible(true)}
             loading={acceptMutation.isPending}
             variant="success"
             size="lg"
-            icon={<CheckCircle2 size={20} color="#ffffff" />}
+            icon={<CheckCircle2 size={18} color="#ffffff" />}
             style={styles.acceptBtn}
           />
-          <AppButton
-            title="Go Back"
-            onPress={() => navigation.goBack()}
-            variant="outline"
-            size="lg"
-          />
         </View>
-      </ScrollView>
+      </View>
+
+      {/* Accept Job Confirm Modal */}
+      <AppConfirmModal
+        visible={acceptModalVisible}
+        title="Accept Ticket"
+        message={`Are you ready to accept ticket ${ticketNo} for ${customerName}? Once accepted, you will start the job flow.`}
+        confirmText="Accept Job"
+        cancelText="Cancel"
+        confirmVariant="success"
+        onConfirm={handleConfirmAccept}
+        onCancel={() => setAcceptModalVisible(false)}
+        loading={acceptMutation.isPending}
+      />
+
+      {/* App Success Modal */}
+      <AppSuccessModal
+        visible={successModalVisible}
+        title="Job Accepted ✓"
+        message={`You have accepted ticket ${ticketNo}. It is now active in your job list.`}
+        onClose={handleSuccessClose}
+        autoCloseDelay={2000}
+      />
     </View>
   );
 };
@@ -215,6 +341,31 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   card: { marginBottom: 16 },
+  infoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  iconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  infoTextContainer: {
+    flex: 1,
+  },
+  infoLabel: {
+    fontSize: 11,
+    fontWeight: "500",
+    textTransform: "uppercase",
+    marginBottom: 2,
+  },
+  infoValue: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
   cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -224,17 +375,42 @@ const styles = StyleSheet.create({
   ticketNo: { fontSize: 12, fontWeight: "700" },
   serviceTitle: { marginBottom: 6 },
   desc: { fontSize: 13, lineHeight: 20 },
-  infoRow: { flexDirection: "row", alignItems: "center", gap: 12 },
-  iconBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
+  customerNameTitle: {
+    fontSize: 16,
+    fontWeight: "700",
   },
-  infoLabel: { fontSize: 11, fontWeight: "500", textTransform: "uppercase", marginBottom: 2 },
-  infoValue: { fontSize: 14, fontWeight: "600" },
   divider: { height: 1, marginVertical: 12 },
-  actions: { gap: 10, marginTop: 8 },
-  acceptBtn: { marginBottom: 0 },
+  actionsRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  rejectBtn: {
+    flex: 1,
+  },
+  acceptBtn: {
+    flex: 1.3,
+  },
+  stickyFooter: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 24,
+    borderTopWidth: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  imageGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 16,
+  },
+  attachedImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    backgroundColor: "#f1f5f9",
+  },
 });

@@ -25,15 +25,20 @@ export const AppSuccessModal: React.FC<AppSuccessModalProps> = ({
   autoCloseDelay = 2000,
 }) => {
   const theme = useTheme();
+  const onCloseRef = React.useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (visible && autoCloseDelay > 0) {
       const timer = setTimeout(() => {
-        onClose();
+        onCloseRef.current();
       }, autoCloseDelay);
       return () => clearTimeout(timer);
     }
-  }, [visible, autoCloseDelay, onClose]);
+  }, [visible, autoCloseDelay]);
 
   return (
     <Modal

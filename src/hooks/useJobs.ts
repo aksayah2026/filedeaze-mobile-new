@@ -7,7 +7,7 @@ import { JobService, TicketStatus, Ticket } from "../services/job.service";
 
 export const jobQueryKeys = {
   all: ["work-orders"] as const,
-  technicianList: () => [...jobQueryKeys.all, "tech-list"] as const,
+  technicianList: (month?: number, year?: number) => [...jobQueryKeys.all, "tech-list", month, year] as const,
   customerList: (mobile: string) => [...jobQueryKeys.all, "cust-list", mobile] as const,
   details: (ticketNo: string) => [...jobQueryKeys.all, "detail", ticketNo] as const,
   attendance: () => ["attendance"] as const,
@@ -20,10 +20,10 @@ export const jobQueryKeys = {
 // TECHNICIAN — TICKET HOOKS
 // ==========================================
 
-export function useTechnicianJobs() {
+export function useTechnicianJobs(month?: number, year?: number) {
   return useQuery({
-    queryKey: jobQueryKeys.technicianList(),
-    queryFn: () => JobService.getTechnicianJobs(),
+    queryKey: jobQueryKeys.technicianList(month, year),
+    queryFn: () => JobService.getTechnicianJobs(month, year),
     staleTime: 10_000,
   });
 }
@@ -40,8 +40,8 @@ export function useUpdateJobStatus() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ ticketNo, status }: { ticketNo: string; status: TicketStatus }) =>
-      JobService.updateJobStatus(ticketNo, status),
+    mutationFn: ({ ticketId, status }: { ticketId: string; status: TicketStatus }) => // CHANGED: Rename ticketNo to ticketId for UUID routing
+      JobService.updateJobStatus(ticketId, status), // CHANGED: Rename ticketNo to ticketId for UUID routing
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: jobQueryKeys.technicianList() });
       queryClient.invalidateQueries({ queryKey: jobQueryKeys.details(data.ticketNo) });
@@ -53,11 +53,11 @@ export function useRejectJob() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ ticketNo, reason }: { ticketNo: string; reason: string }) =>
-      JobService.rejectJob(ticketNo, reason),
+    mutationFn: ({ ticketId, reason }: { ticketId: string; reason: string }) => // CHANGED: Rename ticketNo to ticketId for UUID routing
+      JobService.rejectJob(ticketId, reason), // CHANGED: Rename ticketNo to ticketId for UUID routing
     onSuccess: (_data, vars) => {
       queryClient.invalidateQueries({ queryKey: jobQueryKeys.technicianList() });
-      queryClient.invalidateQueries({ queryKey: jobQueryKeys.details(vars.ticketNo) });
+      queryClient.invalidateQueries({ queryKey: jobQueryKeys.details(vars.ticketId) }); // CHANGED: Use vars.ticketId instead of vars.ticketNo
     },
   });
 }

@@ -25,7 +25,7 @@ export type TechnicianStackParamList = {
   AttendanceHistory: undefined;
   AssignedJobs: undefined;
   // Batch 2 — Job Lifecycle Actions
-  AcceptTicket: { jobId: string; ticketNo: string; customerName: string };
+  AcceptTicket: { jobId: string; ticketNo: string; customerName: string; service: string }; // CHANGED: Add service parameter to match screen expectations and navigation call
   RejectTicket: { jobId: string; ticketNo: string };
   ReachLocation: { jobId: string; ticketNo: string; address: string };
   // Batch 3 — Work Execution
