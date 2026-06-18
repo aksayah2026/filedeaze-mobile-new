@@ -153,21 +153,24 @@ export const AttendanceHistoryScreen = () => {
   }, [currentMonth, currentYear, daysInMonth, firstDayIndex]);
 
   const handleDayPress = (dateStr: string) => {
+    const todayStr = getTodayStr();
+    if (dateStr > todayStr) {
+      return;
+    }
     if (!startDate || (startDate && endDate)) {
       setStartDate(dateStr);
       setEndDate(null);
-      setCalendarVisible(false);
+      // Do not hide calendar yet, let user select end date
     } else {
       if (dateStr < startDate) {
         setStartDate(dateStr);
         setEndDate(null);
-        setCalendarVisible(false);
       } else if (dateStr === startDate) {
         setStartDate(null);
         setEndDate(null);
       } else {
         setEndDate(dateStr);
-        setCalendarVisible(false);
+        setCalendarVisible(false); // Hide calendar when range selection is complete
       }
     }
   };
@@ -374,11 +377,32 @@ export const AttendanceHistoryScreen = () => {
             {getSelectedRangeText()}
           </Text>
         </View>
-        <ChevronDown
-          size={18}
-          color={theme.colors.textMuted}
-          style={{ transform: [{ rotate: calendarVisible ? "180deg" : "0deg" }] }}
-        />
+
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Pressable
+            onPress={(e) => {
+              e.stopPropagation(); // Prevent toggling the calendar visibility
+              const todayStr = getTodayStr();
+              const todayParts = todayStr.split("-");
+              setCurrentMonth(parseInt(todayParts[1], 10));
+              setCurrentYear(parseInt(todayParts[0], 10));
+              setStartDate(todayStr);
+              setEndDate(null);
+              setCalendarVisible(false);
+            }}
+            style={({ pressed }: { pressed: boolean }) => [
+              styles.todayBtn,
+              { backgroundColor: `${theme.colors.primary}12`, opacity: pressed ? 0.7 : 1 }
+            ]}
+          >
+            <Text style={[styles.todayBtnText, { color: theme.colors.primary }]}>Today</Text>
+          </Pressable>
+          <ChevronDown
+            size={18}
+            color={theme.colors.textMuted}
+            style={{ transform: [{ rotate: calendarVisible ? "180deg" : "0deg" }] }}
+          />
+        </View>
       </Pressable>
 
       {/* Calendar Component */}
@@ -393,23 +417,6 @@ export const AttendanceHistoryScreen = () => {
             </Text>
             <Pressable onPress={handleNextMonth} style={styles.navBtn}>
               <ChevronRight size={20} color={theme.colors.text} />
-            </Pressable>
-            <Pressable
-              onPress={() => {
-                const todayStr = getTodayStr();
-                const todayParts = todayStr.split("-");
-                setCurrentMonth(parseInt(todayParts[1], 10));
-                setCurrentYear(parseInt(todayParts[0], 10));
-                setStartDate(todayStr);
-                setEndDate(null);
-                setCalendarVisible(false);
-              }}
-              style={({ pressed }: { pressed: boolean }) => [
-                styles.todayBtn,
-                { backgroundColor: `${theme.colors.primary}12`, opacity: pressed ? 0.7 : 1 }
-              ]}
-            >
-              <Text style={[styles.todayBtnText, { color: theme.colors.primary }]}>Today</Text>
             </Pressable>
           </View>
 
@@ -433,20 +440,23 @@ export const AttendanceHistoryScreen = () => {
               const isInRange = !!(startDate && endDate && dateStr && dateStr > startDate && dateStr < endDate);
               const isSelected = isStart || isEnd || isInRange;
               const isToday = dateStr === getTodayStr();
+              const isFuture = dateStr ? dateStr > getTodayStr() : false;
 
               const record = allRecords.find((r) => r.date === dateStr);
 
               return (
                 <Pressable
                   key={cell.key}
-                  onPress={() => handleDayPress(dateStr!)}
+                  onPress={() => !isFuture && handleDayPress(dateStr!)}
+                  disabled={isFuture}
                   style={({ pressed }: { pressed: boolean }) => [
                     styles.dayCell,
                     isStart && { backgroundColor: theme.colors.primary, borderRadius: 20 },
                     isEnd && { backgroundColor: theme.colors.primary, borderRadius: 20 },
                     isInRange && { backgroundColor: `${theme.colors.primary}15` },
                     isToday && !isStart && !isEnd && { borderWidth: 1.5, borderColor: theme.colors.primary, borderRadius: 20 },
-                    pressed && { opacity: 0.7 },
+                    isFuture && { opacity: 0.3 },
+                    pressed && !isFuture && { opacity: 0.7 },
                   ]}
                 >
                   <Text
@@ -457,8 +467,10 @@ export const AttendanceHistoryScreen = () => {
                           ? "#ffffff"
                           : isSelected
                           ? theme.colors.primary
+                          : isFuture
+                          ? theme.colors.textLight
                           : theme.colors.text,
-                        fontWeight: isSelected || isToday ? "700" : "400",
+                        fontWeight: (isSelected || isToday) && !isFuture ? "700" : "400",
                       },
                     ]}
                   >
@@ -505,6 +517,7 @@ export const AttendanceHistoryScreen = () => {
           }
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          onScrollBeginDrag={() => setCalendarVisible(false)}
         />
       )}
     </View>

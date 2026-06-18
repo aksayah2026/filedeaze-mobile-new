@@ -9,6 +9,7 @@ import {
   Modal,
   TextInput,
   ScrollView,
+  RefreshControl,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -18,12 +19,14 @@ import {
   History,
   MapPin,
   ChevronRight,
+  ChevronLeft,
   User,
   Clock,
   CheckCircle,
   AlertTriangle,
   FileCheck,
   Timer,
+  Calendar,
 } from "lucide-react-native";
 
 import { useTheme } from "../../theme";
@@ -44,13 +47,18 @@ import { AppButton } from "../../components/AppButton";
 import { AppConfirmModal } from "../../components/AppConfirmModal";
 import { AppSuccessModal } from "../../components/AppSuccessModal";
 
+// Import new components
+import { TicketCard } from "../../components/TicketCard";
+import { JobOverviewCard } from "../../components/JobOverviewCard";
+import { EmptyTicketsState } from "../../components/EmptyTicketsState";
+
 type NavigationProp = NativeStackNavigationProp<TechnicianStackParamList, "TechnicianHome">;
 
 export const TechnicianHomeScreen = () => {
   const theme = useTheme();
   const navigation = useNavigation<NavigationProp>();
   const { user, logout } = useAuthStore();
-  const { data: jobs = [], isLoading: isJobsLoading, refetch } = useTechnicianJobs();
+  const { data: jobs = [], isLoading: isJobsLoading, isError, error, refetch, isRefetching } = useTechnicianJobs();
   const { data: attendance, isLoading: isAttendanceLoading } = useAttendanceStatus();
 
   const checkInMutation = useCheckIn();
@@ -103,14 +111,69 @@ export const TechnicianHomeScreen = () => {
     };
   }, [attendance?.checkedIn, attendance?.rawCheckInTime]);
 
+  const getMonthsList = () => {
+    const list = [];
+    const currentDate = new Date();
+    // Add "All" option
+    list.push({ label: "All", month: undefined, year: undefined });
+    for (let i = 0; i < 6; i++) {
+      const d = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
+      const label = d.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+      list.push({
+        label,
+        month: d.getMonth() + 1,
+        year: d.getFullYear(),
+      });
+    }
+    return list;
+  };
+
   // Calculate statistics
   const jobsList = Array.isArray(jobs) ? jobs : [];
+
+  const getTodayStr = () => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
+  const todayStr = getTodayStr();
+
+  // 1. Ongoing tickets: active tickets scheduled for today (or earlier, since they are still active)
+  const ongoing = jobsList.filter(
+    (j) =>
+      !["COMPLETED", "CLOSED", "CANCELLED", "INVOICE_GENERATED"].includes(j.status as string) &&
+      (!j.scheduledDateRaw || j.scheduledDateRaw <= todayStr)
+  );
+
+  // 2. Payment pending: invoice generated
+  const paymentPending = jobsList.filter(
+    (j) => (j.status as string) === "INVOICE_GENERATED"
+  );
+
+  // 3. Completed/Closed today
+  const completedToday = jobsList.filter(
+    (j) =>
+      ["COMPLETED", "CLOSED"].includes(j.status) &&
+      j.scheduledDateRaw === todayStr
+  );
+
+  // 4. Upcoming tickets: scheduled in the future
+  const upcoming = jobsList.filter(
+    (j) =>
+      j.scheduledDateRaw && j.scheduledDateRaw > todayStr &&
+      (j.status as string) !== "CANCELLED"
+  );
+
+  const activeTickets = [...ongoing, ...paymentPending, ...completedToday, ...upcoming];
   const assignedCount = jobsList.filter((j) => j.status === "ASSIGNED" || j.status === "NEW").length;
   const inProgressCount = jobsList.filter(
-    (j) => j.status === "IN_PROGRESS" || j.status === "ACCEPTED" || j.status === "TRAVELLING" || j.status === "REACHED"
+    (j) => j.status === "IN_PROGRESS" || j.status === "ACCEPTED" || j.status === "TRAVELLING" || j.status === "REACHED" || j.status === "COMPLETED"
   ).length;
   const pendingCount = jobsList.filter((j) => j.status === "PENDING" || j.status === "RESCHEDULED").length;
-  const completedCount = jobsList.filter((j) => j.status === "COMPLETED" || j.status === "CLOSED").length;
+  const completedCount = jobsList.filter((j) => j.status === "CLOSED").length;
+  const completionRate = jobsList.length > 0 ? Math.round((completedCount / jobsList.length) * 100) : 0;
 
   const handleCheckInPress = () => {
     if (attendance?.shiftCompleted) {
@@ -281,7 +344,18 @@ export const TechnicianHomeScreen = () => {
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isJobsLoading || isRefetching}
+            onRefresh={refetch}
+            colors={[theme.colors.primary]}
+            tintColor={theme.colors.primary}
+          />
+        }
+      >
         {/* Attendance Card */}
         <AppCard style={styles.attendanceCard}>
           <View style={styles.attendanceHeader}>
@@ -425,106 +499,130 @@ export const TechnicianHomeScreen = () => {
           )}
         </AppCard>
 
-        {/* Stats Grid */}
+        {/* Job Overview */}
         <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>Job Overview</Text>
+        
         <View style={styles.statsGrid}>
-          <View style={[styles.statBox, { backgroundColor: theme.colors.card }]}>
-            <Text style={[styles.statValue, { color: theme.colors.primary }]}>{assignedCount}</Text>
-            <Text style={[styles.statLabel, { color: theme.colors.textMuted }]}>Assigned</Text>
+          <View style={styles.statsRow}>
+            <Pressable
+              onPress={() => navigation.navigate("AssignedJobs", { initialTab: "ASSIGNED" })}
+              style={({ pressed }) => [
+                styles.statBox,
+                {
+                  borderLeftColor: theme.colors.primary,
+                  backgroundColor: theme.colors.card,
+                  borderColor: theme.colors.borderLight,
+                  opacity: pressed ? 0.75 : 1,
+                },
+              ]}
+            >
+              <View style={[styles.iconCircle, { backgroundColor: `${theme.colors.primary}10` }]}>
+                <FileCheck size={18} color={theme.colors.primary} />
+              </View>
+              <View style={styles.statInfo}>
+                <Text style={[styles.statValue, { color: theme.colors.text }]}>{assignedCount}</Text>
+                <Text style={[styles.statLabel, { color: theme.colors.textMuted }]}>Assigned</Text>
+              </View>
+            </Pressable>
+            <Pressable
+              onPress={() => navigation.navigate("AssignedJobs", { initialTab: "IN_PROGRESS" })}
+              style={({ pressed }) => [
+                styles.statBox,
+                {
+                  borderLeftColor: theme.colors.purple,
+                  backgroundColor: theme.colors.card,
+                  borderColor: theme.colors.borderLight,
+                  opacity: pressed ? 0.75 : 1,
+                },
+              ]}
+            >
+              <View style={[styles.iconCircle, { backgroundColor: `${theme.colors.purple}10` }]}>
+                <Timer size={18} color={theme.colors.purple} />
+              </View>
+              <View style={styles.statInfo}>
+                <Text style={[styles.statValue, { color: theme.colors.text }]}>{inProgressCount}</Text>
+                <Text style={[styles.statLabel, { color: theme.colors.textMuted }]}>Active</Text>
+              </View>
+            </Pressable>
           </View>
-          <View style={[styles.statBox, { backgroundColor: theme.colors.card }]}>
-            <Text style={[styles.statValue, { color: theme.colors.warning }]}>{inProgressCount}</Text>
-            <Text style={[styles.statLabel, { color: theme.colors.textMuted }]}>Active</Text>
-          </View>
-          <View style={[styles.statBox, { backgroundColor: theme.colors.card }]}>
-            <Text style={[styles.statValue, { color: theme.colors.danger }]}>{pendingCount}</Text>
-            <Text style={[styles.statLabel, { color: theme.colors.textMuted }]}>Pending</Text>
-          </View>
-          <View style={[styles.statBox, { backgroundColor: theme.colors.card }]}>
-            <Text style={[styles.statValue, { color: theme.colors.success }]}>{completedCount}</Text>
-            <Text style={[styles.statLabel, { color: theme.colors.textMuted }]}>Completed</Text>
+          <View style={styles.statsRow}>
+            <Pressable
+              onPress={() => navigation.navigate("AssignedJobs", { initialTab: "PENDING" })}
+              style={({ pressed }) => [
+                styles.statBox,
+                {
+                  borderLeftColor: theme.colors.amber,
+                  backgroundColor: theme.colors.card,
+                  borderColor: theme.colors.borderLight,
+                  opacity: pressed ? 0.75 : 1,
+                },
+              ]}
+            >
+              <View style={[styles.iconCircle, { backgroundColor: `${theme.colors.amber}10` }]}>
+                <AlertTriangle size={18} color={theme.colors.amber} />
+              </View>
+              <View style={styles.statInfo}>
+                <Text style={[styles.statValue, { color: theme.colors.text }]}>{pendingCount}</Text>
+                <Text style={[styles.statLabel, { color: theme.colors.textMuted }]}>Pending</Text>
+              </View>
+            </Pressable>
+            <Pressable
+              onPress={() => navigation.navigate("AssignedJobs", { initialTab: "COMPLETED" })}
+              style={({ pressed }) => [
+                styles.statBox,
+                {
+                  borderLeftColor: theme.colors.success,
+                  backgroundColor: theme.colors.card,
+                  borderColor: theme.colors.borderLight,
+                  opacity: pressed ? 0.75 : 1,
+                },
+              ]}
+            >
+              <View style={[styles.iconCircle, { backgroundColor: `${theme.colors.success}10` }]}>
+                <CheckCircle size={18} color={theme.colors.success} />
+              </View>
+              <View style={styles.statInfo}>
+                <Text style={[styles.statValue, { color: theme.colors.text }]}>{completedCount}</Text>
+                <Text style={[styles.statLabel, { color: theme.colors.textMuted }]}>Completed</Text>
+              </View>
+            </Pressable>
           </View>
         </View>
 
         {/* Jobs List */}
         <View style={styles.jobsHeader}>
           <Text style={[styles.sectionTitle, { color: theme.colors.textMuted, marginVertical: 0 }]}>
-            Dispatched Tickets
+            Assigned Tickets
           </Text>
           <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
             <Pressable onPress={() => navigation.navigate("AssignedJobs")}>
               <Text style={{ fontSize: 12, color: theme.colors.primary, fontWeight: "700" }}>View All</Text>
             </Pressable>
-            <Pressable onPress={() => refetch()}>
-              <Text style={{ fontSize: 12, color: theme.colors.textMuted, fontWeight: "600" }}>Refresh</Text>
-            </Pressable>
           </View>
         </View>
 
-        {isJobsLoading ? (
+        {isJobsLoading && !isRefetching ? (
           <AppLoader message="Loading assigned jobs..." />
-        ) : jobsList.length === 0 ? (
-          <AppEmptyState
-            title="No Assigned Jobs"
-            description="You have no tickets currently dispatched to you today."
-          />
+        ) : isError ? (
+          <View style={[styles.errorContainer, { borderColor: theme.colors.danger }]}>
+            <AlertTriangle size={36} color={theme.colors.danger} />
+            <Text style={[styles.errorTitle, { color: theme.colors.text }]}>Failed to load tickets</Text>
+            <Text style={[styles.errorSubtitle, { color: theme.colors.textMuted }]}>
+              {error?.message || "An unexpected error occurred."}
+            </Text>
+            <AppButton title="Retry" onPress={() => refetch()} variant="outline" size="sm" style={styles.errorBtn} />
+          </View>
+        ) : activeTickets.length === 0 ? (
+          <EmptyTicketsState onRefresh={refetch} isRefreshing={isRefetching} />
         ) : (
-          jobsList.map((item) => (
-            <AppCard
-              key={item.ticketNo}
-              onPress={() => navigation.navigate("TechnicianJobDetails", { jobId: item.ticketNo })}
-              style={styles.jobCard}
-            >
-              <View style={styles.cardHeader}>
-                <Text style={[styles.jobId, { color: theme.colors.textMuted }]}>{item.ticketNo}</Text>
-                <View style={styles.badgeRow}>
-                  <AppBadge label={item.status} variant={getStatusVariant(item.status)} />
-                </View>
-              </View>
-
-              <Text
-                style={[
-                  styles.cardTitle,
-                  {
-                    color: theme.colors.text,
-                    fontSize: theme.typography.fontSize.md,
-                    fontWeight: theme.typography.fontWeight.semibold,
-                  },
-                ]}
-              >
-                {item.service}
-              </Text>
-
-              <Text style={{ color: theme.colors.textMuted, fontSize: 13, marginBottom: 12 }} numberOfLines={2}>
-                {item.description}
-              </Text>
-
-              <View style={styles.infoLine}>
-                <History size={14} color={theme.colors.textMuted} style={styles.infoIcon} />
-                <Text style={[styles.infoText, { color: theme.colors.textMuted }]}>
-                  {item.scheduledDate} | {item.scheduledTime}
-                </Text>
-              </View>
-
-              <View style={styles.infoLine}>
-                <MapPin size={14} color={theme.colors.textMuted} style={styles.infoIcon} />
-                <Text style={[styles.infoText, { color: theme.colors.textMuted }]} numberOfLines={1}>
-                  {item.address}
-                </Text>
-              </View>
-
-              <View style={[styles.divider, { backgroundColor: theme.colors.borderLight }]} />
-
-              <View style={styles.cardFooter}>
-                <Text style={[styles.customerLabel, { color: theme.colors.textLight }]}>
-                  Client: <Text style={{ color: theme.colors.text, fontWeight: "600" }}>{item.customerName}</Text>
-                </Text>
-                <View style={styles.actionLink}>
-                  <Text style={[styles.actionLinkText, { color: theme.colors.primary }]}>View</Text>
-                  <ChevronRight size={16} color={theme.colors.primary} />
-                </View>
-              </View>
-            </AppCard>
+          activeTickets.map((item, index) => (
+            <TicketCard
+              key={`${item.id || item.ticketNo}-${index}`}
+              ticket={item}
+              onPress={() => {
+                navigation.navigate("TechnicianJobDetails", { jobId: item.id });
+              }}
+            />
           ))
         )}
       </ScrollView>
@@ -607,6 +705,8 @@ export const TechnicianHomeScreen = () => {
         confirmVariant="danger"
       />
 
+      
+
       <AppSuccessModal
         visible={successModalVisible}
         title={successTitle}
@@ -687,28 +787,43 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   statsGrid: {
-    flexDirection: "row",
-    gap: 8,
+    gap: 12,
     marginBottom: 20,
+  },
+  statsRow: {
+    flexDirection: "row",
+    gap: 12,
   },
   statBox: {
     flex: 1,
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 12,
-    borderRadius: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderLeftWidth: 4,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
+    gap: 10,
+  },
+  statInfo: {
+    flex: 1,
   },
   statValue: {
     fontSize: 18,
     fontWeight: "800",
+    lineHeight: 22,
   },
   statLabel: {
     fontSize: 10,
     fontWeight: "600",
     textTransform: "uppercase",
-    marginTop: 4,
+    letterSpacing: 0.4,
+    marginTop: 1,
   },
   jobsHeader: {
     flexDirection: "row",
@@ -973,5 +1088,105 @@ const styles = StyleSheet.create({
   benefitText: {
     fontSize: 13,
     lineHeight: 18,
+  },
+  filterContainer: {
+    marginBottom: 20,
+    marginTop: 10,
+  },
+  filterHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  filterLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+  },
+  filterPillScroll: {
+    paddingVertical: 4,
+    paddingRight: 12,
+  },
+  filterPill: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 8,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  filterPillText: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  customFilterBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    marginLeft: 8,
+  },
+  yearSelector: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    width: "100%",
+    marginBottom: 20,
+    paddingHorizontal: 20,
+  },
+  yearText: {
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  monthsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 8,
+    width: "100%",
+    marginBottom: 20,
+  },
+  monthGridItem: {
+    width: "30%",
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  monthGridText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  errorContainer: {
+    padding: 24,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    marginVertical: 20,
+    backgroundColor: "rgba(239, 68, 68, 0.05)",
+  },
+  errorTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    marginTop: 12,
+    marginBottom: 6,
+    textAlign: "center",
+  },
+  errorSubtitle: {
+    fontSize: 13,
+    textAlign: "center",
+    lineHeight: 18,
+    marginBottom: 16,
+  },
+  errorBtn: {
+    minWidth: 120,
   },
 });

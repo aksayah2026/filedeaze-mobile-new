@@ -20,6 +20,7 @@ interface AppConfirmModalProps {
   onCancel: () => void;
   confirmVariant?: "primary" | "secondary" | "success" | "warning" | "danger";
   loading?: boolean;
+  showCancel?: boolean;
 }
 
 export const AppConfirmModal: React.FC<AppConfirmModalProps> = ({
@@ -32,6 +33,7 @@ export const AppConfirmModal: React.FC<AppConfirmModalProps> = ({
   onCancel,
   confirmVariant = "danger",
   loading = false,
+  showCancel = true,
 }) => {
   const theme = useTheme();
 
@@ -64,14 +66,16 @@ export const AppConfirmModal: React.FC<AppConfirmModalProps> = ({
 
           {/* Buttons Row */}
           <View style={styles.buttonRow}>
-            <AppButton
-              title={cancelText}
-              variant="ghost"
-              onPress={onCancel}
-              style={styles.btn}
-              textStyle={{ color: theme.colors.textMuted }}
-              disabled={loading}
-            />
+            {showCancel && (
+              <AppButton
+                title={cancelText}
+                variant="ghost"
+                onPress={onCancel}
+                style={styles.btn}
+                textStyle={{ color: theme.colors.textMuted }}
+                disabled={loading}
+              />
+            )}
             <AppButton
               title={confirmText}
               variant={confirmVariant}

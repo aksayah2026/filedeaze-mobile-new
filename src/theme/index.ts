@@ -14,6 +14,8 @@ export interface ThemeColors {
   border: string;
   borderLight: string;
   shadow: string;
+  purple: string;
+  amber: string;
 }
 
 export interface Spacing {
@@ -59,7 +61,7 @@ export interface AppTheme {
 }
 
 export const DEFAULT_THEME_COLORS: ThemeColors = {
-  primary: APP_CONFIG.primaryColor || "#2563EB",
+  primary: (APP_CONFIG as any).primaryColor || "#2563EB",
   secondary: "#0f172a", // Default secondary (slate-900)
   success: "#10b981", // Emerald-500
   warning: "#f59e0b", // Amber-500
@@ -72,6 +74,8 @@ export const DEFAULT_THEME_COLORS: ThemeColors = {
   border: "#cbd5e1", // Slate-300
   borderLight: "#e2e8f0", // Slate-200
   shadow: "rgba(15, 23, 42, 0.08)",
+  purple: "#8b5cf6", // Purple-500
+  amber: "#f59e0b", // Amber-500 (standard warning)
 };
 
 export const SPACING: Spacing = {

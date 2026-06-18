@@ -19,9 +19,12 @@ export type TicketStatus =
 export type TicketPriority = "URGENT" | "HIGH" | "MEDIUM" | "LOW";
 
 export interface Ticket {
+  id: string; // CHANGED: Add UUID field for API calls
   ticketNo: string;
   customerName: string;
   customerMobile: string;
+  customerEmail?: string;
+  customerAlternatePhone?: string;
   service: string;
   description: string;
   status: TicketStatus;
@@ -44,6 +47,8 @@ export interface Ticket {
   category?: string;
   subCategory?: string;
   images?: string[];
+  statusLogs?: { status: string; changedAt: string }[];
+  scheduledDateRaw?: string;
 }
 
 export interface Invoice {
@@ -73,6 +78,62 @@ export interface AttendanceRecord {
   workingHours?: string;
   location?: string;
   status: "PRESENT" | "ABSENT" | "HALF_DAY" | "LATE";
+}
+
+export function normalizeTicket(raw: any): Ticket {
+  if (!raw) return {} as Ticket;
+
+  let scheduledDate = "—";
+  let scheduledTime = "—";
+  if (raw.scheduledAt) {
+    const d = new Date(raw.scheduledAt);
+    scheduledDate = d.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      timeZone: "Asia/Kolkata",
+    });
+    scheduledTime = d.toLocaleTimeString("en-IN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+      timeZone: "Asia/Kolkata",
+    });
+  }
+
+  // Handle images if they exist in raw
+  const images = Array.isArray(raw.images) ? raw.images : [];
+  const beforePhotos = images.filter((img: any) => img.type === "BEFORE").map((img: any) => img.imageUrl);
+  const afterPhotos = images.filter((img: any) => img.type === "AFTER").map((img: any) => img.imageUrl);
+  const customerSignature = images.find((img: any) => img.type === "SIGNATURE")?.imageUrl;
+
+  return {
+    id: raw.id ?? "",
+    ticketNo: raw.ticketNumber ?? raw.ticketNo ?? "",
+    customerName: raw.customer?.name ?? raw.customerName ?? "—",
+    customerMobile: raw.customer?.phone ?? raw.customerMobile ?? "",
+    customerEmail: raw.customer?.email ?? undefined,
+    customerAlternatePhone: raw.customer?.alternatePhone ?? undefined,
+    service: raw.subCategory?.name ?? raw.service ?? "—",
+    category: raw.subCategory?.category?.name ?? raw.category ?? "",
+    description: raw.description ?? "",
+    status: raw.status === "REACHED_LOCATION" ? "REACHED" : raw.status === "NEW_TICKET" ? "NEW" : raw.status === "TICKET_CLOSED" ? "CLOSED" : (raw.status ?? "ASSIGNED"),
+    priority: raw.priority ?? undefined,
+    scheduledDate,
+    scheduledTime,
+    address: raw.serviceAddress ?? raw.address ?? "—",
+    beforePhotos: beforePhotos.length > 0 ? beforePhotos : undefined,
+    afterPhotos: afterPhotos.length > 0 ? afterPhotos : undefined,
+    customerSignature: customerSignature ?? undefined,
+    pendingReason: raw.pendingReason ?? undefined,
+    workNotes: raw.workNotes ?? undefined,
+    duration: raw.duration ?? undefined,
+    paymentCollection: raw.paymentCollection ?? undefined,
+    paymentMethod: raw.paymentMethod ?? undefined,
+    scheduledDateRaw: raw.scheduledAt ? raw.scheduledAt.split("T")[0] : undefined,
+    images: images.map((img: any) => img.imageUrl),
+    statusLogs: raw.statusLogs ?? [],
+  };
 }
 
 function normalizeAttendanceLog(raw: any): AttendanceLog {
@@ -178,9 +239,13 @@ export class JobService {
    * GET /mobile/technician/tickets
    * Returns all tickets assigned to the logged-in technician.
    */
-  static async getTechnicianJobs(): Promise<Ticket[]> {
-    const res = await apiClient.get<Ticket[]>(`${BASE}/tickets`);
-    return res.data;
+  static async getTechnicianJobs(month?: number, year?: number): Promise<Ticket[]> {
+    const params: Record<string, number> = {};
+    if (month !== undefined) params.month = month;
+    if (year !== undefined) params.year = year;
+    const res = await apiClient.get<any>(`${BASE}/tickets`, { params });
+    const rawList = Array.isArray(res.data) ? res.data : res.data?.data ?? [];
+    return rawList.map(normalizeTicket);
   }
 
   /**
@@ -188,8 +253,10 @@ export class JobService {
    */
   static async getJobDetails(ticketNo: string): Promise<Ticket | null> {
     try {
-      const res = await apiClient.get<Ticket>(`${BASE}/tickets/${ticketNo}`);
-      return res.data;
+      const res = await apiClient.get<any>(`${BASE}/tickets/${ticketNo}`);
+      const rawData = res.data && res.data.data ? res.data.data : res.data;
+      if (!rawData) return null;
+      return normalizeTicket(rawData);
     } catch {
       return null;
     }
@@ -200,7 +267,12 @@ export class JobService {
    * Body: { status }
    */
   static async updateJobStatus(ticketNo: string, status: TicketStatus): Promise<Ticket> {
-    const res = await apiClient.patch<Ticket>(`${BASE}/tickets/${ticketNo}/status`, { status });
+    let apiStatus: string = status;
+    if (status === "REACHED") apiStatus = "REACHED_LOCATION";
+    else if (status === "NEW") apiStatus = "NEW_TICKET";
+    else if (status === "CLOSED") apiStatus = "TICKET_CLOSED";
+
+    const res = await apiClient.patch<Ticket>(`${BASE}/tickets/${ticketNo}/status`, { status: apiStatus });
     return res.data;
   }
 
@@ -274,7 +346,11 @@ export class JobService {
       paymentMethod?: string;
     }
   ): Promise<Ticket> {
-    const res = await apiClient.post<Ticket>(`${BASE}/tickets/${ticketNo}/complete`, payload);
+    const backendPayload = {
+      customerSignature: payload.customerSignature || "captured",
+      notes: payload.workNotes || "Completed",
+    };
+    const res = await apiClient.post<Ticket>(`${BASE}/tickets/${ticketNo}/complete`, backendPayload);
     return res.data;
   }
 
@@ -295,16 +371,18 @@ export class JobService {
     return res.data;
   }
 
-  /**
-   * POST /mobile/technician/tickets/:ticketNo/collect-payment
-   */
   static async collectPayment(
     ticketNo: string,
     payload: { amount: number; paymentMethod: string }
   ): Promise<{ invoiceNo: string; ticketNo: string; amount: number }> {
+    const methodMapped = payload.paymentMethod.toUpperCase() === "CASH" ? "CASH" : "UPI_QR";
+    const backendPayload = {
+      amount: payload.amount,
+      method: methodMapped,
+    };
     const res = await apiClient.post<{ invoiceNo: string; ticketNo: string; amount: number }>(
       `${BASE}/tickets/${ticketNo}/collect-payment`,
-      payload
+      backendPayload
     );
     return res.data;
   }
@@ -427,10 +505,10 @@ export class JobService {
    * GET /mobile/customer/tickets?mobile=
    */
   static async getCustomerTickets(mobile: string): Promise<Ticket[]> {
-    const res = await apiClient.get<Ticket[]>("/mobile/customer/tickets", {
+    const res = await apiClient.get<any>("/mobile/customer/tickets", {
       params: { mobile },
     });
-    return res.data;
+    return res.data?.data || [];
   }
 
   /**
@@ -453,10 +531,10 @@ export class JobService {
    * GET /mobile/customer/invoices?mobile=
    */
   static async getCustomerInvoices(mobile: string): Promise<Invoice[]> {
-    const res = await apiClient.get<Invoice[]>("/mobile/customer/invoices", {
+    const res = await apiClient.get<any>("/mobile/customer/invoices", {
       params: { mobile },
     });
-    return res.data;
+    return res.data?.data || [];
   }
 }
 

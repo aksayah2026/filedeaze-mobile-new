@@ -77,7 +77,7 @@ export const ReachLocationScreen = () => {
     }
 
     try {
-      await reachMutation.mutateAsync({ ticketNo: jobId, status: "REACHED" });
+      await reachMutation.mutateAsync({ ticketId: jobId, status: "REACHED" }); // CHANGED: Rename ticketNo to ticketId for UUID routing
       Alert.alert(
         "Marked as Reached ✓",
         `Location recorded at ${timestamp}.\nCoords: ${gpsCoords.lat}, ${gpsCoords.lng}`,

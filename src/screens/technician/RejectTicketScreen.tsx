@@ -20,6 +20,8 @@ import { AppHeader } from "../../components/AppHeader";
 import { AppCard } from "../../components/AppCard";
 import { AppButton } from "../../components/AppButton";
 import { AppLoader } from "../../components/AppLoader";
+import { AppConfirmModal } from "../../components/AppConfirmModal";
+import { AppSuccessModal } from "../../components/AppSuccessModal";
 
 type RouteProps = RouteProp<TechnicianStackParamList, "RejectTicket">;
 type NavigationProp = NativeStackNavigationProp<TechnicianStackParamList, "RejectTicket">;
@@ -42,36 +44,30 @@ export const RejectTicketScreen = () => {
   const rejectMutation = useRejectJob();
 
   const [reason, setReason] = useState("");
+  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
 
-  const handleReject = async () => {
+  const handleReject = () => {
     if (!reason.trim()) {
       Alert.alert("Required", "Please provide a reason for rejecting this job.");
       return;
     }
+    setConfirmModalVisible(true);
+  };
 
-    Alert.alert(
-      "Confirm Rejection",
-      "This will notify the dispatch team and the job will be reassigned. Continue?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Reject Job",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await rejectMutation.mutateAsync({ ticketNo: jobId, reason });
-              Alert.alert(
-                "Job Rejected",
-                "The dispatch team has been notified. This job will be reassigned.",
-                [{ text: "OK", onPress: () => navigation.navigate("TechnicianHome") }]
-              );
-            } catch (err: any) {
-              Alert.alert("Error", err.message || "Failed to reject job.");
-            }
-          },
-        },
-      ]
-    );
+  const handleConfirmReject = async () => {
+    setConfirmModalVisible(false);
+    try {
+      await rejectMutation.mutateAsync({ ticketId: jobId, reason });
+      setSuccessModalVisible(true);
+    } catch (err: any) {
+      Alert.alert("Error", err.message || "Failed to reject job.");
+    }
+  };
+
+  const handleSuccessClose = () => {
+    setSuccessModalVisible(false);
+    navigation.navigate("TechnicianHome");
   };
 
   if (isLoading) {
@@ -195,14 +191,30 @@ export const RejectTicketScreen = () => {
             size="lg"
             icon={<XCircle size={20} color="#ffffff" />}
           />
-          <AppButton
-            title="Go Back"
-            onPress={() => navigation.goBack()}
-            variant="outline"
-            size="lg"
-          />
         </View>
       </ScrollView>
+
+      {/* Reject Job Confirm Modal */}
+      <AppConfirmModal
+        visible={confirmModalVisible}
+        title="Confirm Rejection"
+        message="This will notify the dispatch team and the job will be reassigned. Are you sure you want to proceed?"
+        confirmText="Reject Job"
+        cancelText="Cancel"
+        confirmVariant="danger"
+        onConfirm={handleConfirmReject}
+        onCancel={() => setConfirmModalVisible(false)}
+        loading={rejectMutation.isPending}
+      />
+
+      {/* Reject Job Success Modal */}
+      <AppSuccessModal
+        visible={successModalVisible}
+        title="Job Rejected"
+        message="The dispatch team has been notified. This job will be reassigned."
+        onClose={handleSuccessClose}
+        autoCloseDelay={2000}
+      />
     </KeyboardAvoidingView>
   );
 };
