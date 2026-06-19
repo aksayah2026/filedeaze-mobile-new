@@ -11,7 +11,7 @@ import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Calendar, CreditCard, ChevronRight, Inbox } from "lucide-react-native";
 import { useTheme } from "../../theme";
-import { useCustomerPayments } from "../../hooks/useCustomer";
+import { useCustomerPayments, useCustomerInvoices } from "../../hooks/useCustomer";
 import { CustomerStackParamList } from "../../types/navigation.types";
 import { AppHeader } from "../../components/AppHeader";
 import { AppLoader } from "../../components/AppLoader";
@@ -25,6 +25,7 @@ export const PaymentHistoryScreen = () => {
   const navigation = useNavigation<NavigationProp>();
 
   const { data: payments = [], isLoading, refetch, isFetching } = useCustomerPayments();
+  const { data: invoices = [] } = useCustomerInvoices();
 
   const getStatusVariant = (status: string) => {
     const s = status.toUpperCase();
@@ -64,7 +65,8 @@ export const PaymentHistoryScreen = () => {
               onPress={() => {
                 if (item.invoice?.invoiceNumber) {
                   // Direct to invoice details
-                  navigation.navigate("InvoiceDetails", { invoiceId: item.id });
+                  const matchingInvoice = invoices.find(inv => inv.invoiceNumber === item.invoice?.invoiceNumber);
+                  navigation.navigate("InvoiceDetails", { invoiceId: matchingInvoice?.id || item.id });
                 }
               }}
             >

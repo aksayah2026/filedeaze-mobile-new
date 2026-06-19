@@ -32,6 +32,7 @@ import {
   Building,
   Hash,
   Menu,
+  Edit2,
 } from "lucide-react-native";
 
 import { useTheme } from "../../theme";
@@ -64,6 +65,7 @@ export const CustomerHomeScreen = () => {
   const [activeTab, setActiveTab] = useState<CustomerTab>("TICKETS");
   const [logoutPopupVisible, setLogoutPopupVisible] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
 
   // Queries
   const { data: tickets = [], isLoading: isTicketsLoading, refetch: refetchTickets, isFetching: isFetchingTickets } = useCustomerTickets();
@@ -131,6 +133,7 @@ export const CustomerHomeScreen = () => {
       },
       {
         onSuccess: () => {
+          setIsEditingProfile(false);
           Alert.alert("Success", "Profile updated successfully!");
         },
         onError: (err: any) => {
@@ -414,20 +417,6 @@ export const CustomerHomeScreen = () => {
                     </View>
                     <ChevronRight size={18} color={theme.colors.textMuted} />
                   </Pressable>
-
-                  <Pressable
-                    onPress={() => {
-                      closeDrawer();
-                      navigation.navigate("AddressBook");
-                    }}
-                    style={({ pressed }) => [styles.menuItemRow, pressed && { opacity: 0.7 }]}
-                  >
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-                      <MapPin size={20} color={theme.colors.textMuted} />
-                      <Text style={[styles.menuItemLabel, { color: theme.colors.text }]}>Manage Address Book</Text>
-                    </View>
-                    <ChevronRight size={18} color={theme.colors.textMuted} />
-                  </Pressable>
                 </ScrollView>
 
                 <View style={[styles.drawerFooter, { borderTopColor: theme.colors.borderLight }]}>
@@ -576,7 +565,8 @@ export const CustomerHomeScreen = () => {
                   style={styles.ticketCard}
                   onPress={() => {
                     if (item.invoice?.invoiceNumber) {
-                      navigation.navigate("InvoiceDetails", { invoiceId: item.id });
+                      const matchingInvoice = invoices.find(inv => inv.invoiceNumber === item.invoice?.invoiceNumber);
+                      navigation.navigate("InvoiceDetails", { invoiceId: matchingInvoice?.id || item.id });
                     }
                   }}
                 >
@@ -631,14 +621,31 @@ export const CustomerHomeScreen = () => {
             style={{ flex: 1 }}
           >
             <AppCard style={styles.formCard}>
-              <Text style={[styles.drawerSectionTitle, { color: theme.colors.textMuted, marginBottom: 16 }]}>Profile Details</Text>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                <Text style={[styles.drawerSectionTitle, { color: theme.colors.textMuted, marginVertical: 0 }]}>Profile Details</Text>
+                <Pressable
+                  onPress={() => setIsEditingProfile(!isEditingProfile)}
+                  style={({ pressed }) => [
+                    styles.editToggleBtn,
+                    { backgroundColor: isEditingProfile ? `${theme.colors.danger}15` : `${theme.colors.primary}15` },
+                    pressed && { opacity: 0.7 }
+                  ]}
+                >
+                  <Edit2 size={14} color={isEditingProfile ? theme.colors.danger : theme.colors.primary} style={{ marginRight: 4 }} />
+                  <Text style={[styles.editToggleText, { color: isEditingProfile ? theme.colors.danger : theme.colors.primary }]}>
+                    {isEditingProfile ? "Cancel" : "Edit"}
+                  </Text>
+                </Pressable>
+              </View>
               
               <AppInput
                 label="Name"
                 value={name}
                 onChangeText={setName}
                 placeholder="Enter your name"
+                editable={isEditingProfile}
                 leftIcon={<User size={16} color={theme.colors.textMuted} />}
+                style={!isEditingProfile && { opacity: 0.7 }}
               />
 
               <AppInput
@@ -648,7 +655,9 @@ export const CustomerHomeScreen = () => {
                 placeholder="Enter email address"
                 keyboardType="email-address"
                 autoCapitalize="none"
+                editable={isEditingProfile}
                 leftIcon={<Mail size={16} color={theme.colors.textMuted} />}
+                style={!isEditingProfile && { opacity: 0.7 }}
               />
 
               <AppInput
@@ -668,7 +677,9 @@ export const CustomerHomeScreen = () => {
                 onChangeText={setAlternatePhone}
                 placeholder="Enter alternate phone number"
                 keyboardType="phone-pad"
+                editable={isEditingProfile}
                 leftIcon={<Phone size={16} color={theme.colors.textMuted} />}
+                style={!isEditingProfile && { opacity: 0.7 }}
               />
 
               <View style={[styles.divider, { backgroundColor: theme.colors.borderLight, marginVertical: 16 }]} />
@@ -680,7 +691,9 @@ export const CustomerHomeScreen = () => {
                 value={address}
                 onChangeText={setAddress}
                 placeholder="Enter street address"
+                editable={isEditingProfile}
                 leftIcon={<MapPin size={16} color={theme.colors.textMuted} />}
+                style={!isEditingProfile && { opacity: 0.7 }}
               />
 
               <AppInput
@@ -688,7 +701,9 @@ export const CustomerHomeScreen = () => {
                 value={city}
                 onChangeText={setCity}
                 placeholder="Enter city"
+                editable={isEditingProfile}
                 leftIcon={<Building size={16} color={theme.colors.textMuted} />}
+                style={!isEditingProfile && { opacity: 0.7 }}
               />
 
               <AppInput
@@ -697,15 +712,19 @@ export const CustomerHomeScreen = () => {
                 onChangeText={setPincode}
                 placeholder="Enter pincode"
                 keyboardType="numeric"
+                editable={isEditingProfile}
                 leftIcon={<Hash size={16} color={theme.colors.textMuted} />}
+                style={!isEditingProfile && { opacity: 0.7 }}
               />
 
-              <AppButton
-                title="Save Changes"
-                onPress={handleSaveProfile}
-                loading={updateProfileMutation.isPending}
-                style={{ marginTop: 24 }}
-              />
+              {isEditingProfile && (
+                <AppButton
+                  title="Save Changes"
+                  onPress={handleSaveProfile}
+                  loading={updateProfileMutation.isPending}
+                  style={{ marginTop: 24 }}
+                />
+              )}
             </AppCard>
           </KeyboardAvoidingView>
         )}
@@ -948,6 +967,17 @@ const styles = StyleSheet.create({
   },
   valueAmount: {
     fontSize: 15,
+    fontWeight: "700",
+  },
+  editToggleBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+  },
+  editToggleText: {
+    fontSize: 12,
     fontWeight: "700",
   },
 });
