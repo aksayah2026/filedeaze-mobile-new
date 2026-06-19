@@ -1281,7 +1281,6 @@ export const TechnicianJobDetailsScreen = () => {
         onClose={() => setSuccessVisible(false)}
         autoCloseDelay={2000}
       />
-
       {/* App Alert Warning Modal */}
       <AppConfirmModal
         visible={alertModalVisible}

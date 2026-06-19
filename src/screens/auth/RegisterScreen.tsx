@@ -218,7 +218,7 @@ export const RegisterScreen = () => {
         <Pressable onPress={() => navigation.navigate("Login")} style={styles.loginLink}>
           <Text style={{ fontSize: 13, color: theme.colors.textMuted }}>
             Already have an account?{" "}
-            <Text style={{ color: theme.colors.primary, fontWeight: "750" }}>Sign In</Text>
+            <Text style={{ color: theme.colors.primary, fontWeight: "700" }}>Sign In</Text>
           </Text>
         </Pressable>
       </ScrollView>

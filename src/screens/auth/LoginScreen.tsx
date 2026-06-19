@@ -84,8 +84,8 @@ export const LoginScreen = () => {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.headerSection}>
-          {APP_CONFIG.logo ? (
-            <Image source={{ uri: APP_CONFIG.logo }} style={styles.logo} />
+          {(APP_CONFIG as any).logo ? (
+            <Image source={{ uri: (APP_CONFIG as any).logo }} style={styles.logo} />
           ) : (
             <View style={[styles.logoPlaceholder, { backgroundColor: theme.colors.primary }]}>
               <Shield color="#ffffff" size={36} />

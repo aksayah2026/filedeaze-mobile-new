@@ -130,7 +130,6 @@ export const TechnicianHomeScreen = () => {
 
   // Calculate statistics
   const jobsList = Array.isArray(jobs) ? jobs : [];
-
   const getTodayStr = () => {
     const d = new Date();
     const y = d.getFullYear();

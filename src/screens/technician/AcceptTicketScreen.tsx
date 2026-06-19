@@ -319,7 +319,6 @@ export const AcceptTicketScreen = () => {
         onClose={handleSuccessClose}
         autoCloseDelay={2000}
       />
-
       {/* App Alert Warning Modal */}
       <AppConfirmModal
         visible={alertModalVisible}
