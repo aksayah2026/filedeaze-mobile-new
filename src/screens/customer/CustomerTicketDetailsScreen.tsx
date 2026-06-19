@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Image, Linking, Alert, Modal, Pressable } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Linking, Alert, Modal, Pressable } from "react-native";
 import { useRoute, useNavigation, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
@@ -22,16 +22,16 @@ import { AppBadge } from "../../components/AppBadge";
 import { AppButton } from "../../components/AppButton";
 import { AppInput } from "../../components/AppInput";
 
-type RouteProps = RouteProp<CustomerStackParamList, "CustomerJobDetails">;
-type NavigationProp = NativeStackNavigationProp<CustomerStackParamList, "CustomerJobDetails">;
+type NavigationProp = NativeStackNavigationProp<CustomerStackParamList, "CustomerTicketDetails">;
+type RouteProps = RouteProp<CustomerStackParamList, "CustomerTicketDetails">;
 
-export const CustomerJobDetailsScreen = () => {
+export const CustomerTicketDetailsScreen = () => {
   const theme = useTheme();
   const route = useRoute<RouteProps>();
   const navigation = useNavigation<NavigationProp>();
-  const { jobId } = route.params;
+  const { ticketId } = route.params;
 
-  const { data: ticket, isLoading, refetch } = useCustomerTicketDetails(jobId);
+  const { data: ticket, isLoading, refetch } = useCustomerTicketDetails(ticketId);
   const cancelTicketMutation = useCancelCustomerTicket();
 
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
@@ -47,7 +47,7 @@ export const CustomerJobDetailsScreen = () => {
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader showBack onBackPress={() => navigation.goBack()} title="Ticket Details" />
-        <AppLoader message="Retrieving status..." />
+        <AppLoader message="Retrieving details..." />
       </View>
     );
   }
@@ -55,9 +55,9 @@ export const CustomerJobDetailsScreen = () => {
   if (!ticket) {
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        <AppHeader showBack onBackPress={() => navigation.goBack()} title="Error" />
+        <AppHeader showBack onBackPress={() => navigation.goBack()} title="Ticket Details" />
         <View style={styles.errorContent}>
-          <Text style={{ color: theme.colors.textMuted }}>Service ticket not found.</Text>
+          <Text style={{ color: theme.colors.textMuted }}>Ticket not found.</Text>
         </View>
       </View>
     );
@@ -131,7 +131,7 @@ export const CustomerJobDetailsScreen = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <AppHeader showBack onBackPress={() => navigation.goBack()} title={`Track: ${ticket.ticketNumber}`} />
+      <AppHeader showBack onBackPress={() => navigation.goBack()} title="Ticket Details" />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Ticket Title Card */}
@@ -142,14 +142,16 @@ export const CustomerJobDetailsScreen = () => {
             </View>
             <AppBadge label={badgeProps.label} variant={badgeProps.variant} />
           </View>
-          <Text style={[styles.title, { color: theme.colors.text }]}>
-            {ticket.subCategory?.name || "General Service"}
+          <Text style={[styles.title, { color: theme.colors.text }]} numberOfLines={2}>
+            {ticket.subCategory?.name || "—"}
           </Text>
-          <Text style={[styles.desc, { color: theme.colors.textMuted }]}>{ticket.description}</Text>
+          <Text style={[styles.desc, { color: theme.colors.textMuted }]}>
+            {ticket.description}
+          </Text>
         </View>
 
         {/* Assigned Technician Profile */}
-        <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>Assigned Expert</Text>
+        <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>Assigned Technician</Text>
         <View style={[styles.premiumCard, { backgroundColor: theme.colors.card }]}>
           {ticket.technician ? (
             <View style={styles.techRow}>
@@ -161,7 +163,7 @@ export const CustomerJobDetailsScreen = () => {
               <View style={styles.techText}>
                 <Text style={[styles.techName, { color: theme.colors.text }]}>{ticket.technician.name}</Text>
                 <Text style={[styles.techRole, { color: theme.colors.textMuted, marginTop: 2 }]}>
-                  Certified Field Service Technician
+                  Field Technician • {ticket.technician.phone}
                 </Text>
               </View>
             </View>
@@ -171,7 +173,7 @@ export const CustomerJobDetailsScreen = () => {
                 <HelpCircle color={theme.colors.textMuted} size={22} />
               </View>
               <View style={styles.techText}>
-                <Text style={[styles.techName, { color: theme.colors.textMuted }]}>Assigning Expert...</Text>
+                <Text style={[styles.techName, { color: theme.colors.textMuted }]}>Assigning Soon...</Text>
                 <Text style={{ color: theme.colors.textMuted, fontSize: 12, marginTop: 2 }}>
                   We are assigning the best technician for you
                 </Text>
@@ -198,7 +200,7 @@ export const CustomerJobDetailsScreen = () => {
           )}
         </View>
 
-        {/* Service Location details */}
+        {/* Scheduled date card */}
         <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>Schedule & Site</Text>
         <View style={[styles.premiumCard, { backgroundColor: theme.colors.card }]}>
           <View style={styles.infoRow}>
@@ -257,8 +259,8 @@ export const CustomerJobDetailsScreen = () => {
           </>
         )}
 
-        {/* Visual Progress Timeline */}
-        <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>Timeline</Text>
+        {/* Timeline Status History */}
+        <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>Status Timeline</Text>
 
         <View style={[styles.premiumCard, { backgroundColor: theme.colors.card, paddingVertical: 20 }]}>
           {ticket.statusLogs && ticket.statusLogs.length > 0 ? (
@@ -279,6 +281,7 @@ export const CustomerJobDetailsScreen = () => {
                     ]} />
                     {!isLast && <View style={[styles.timelineLine, { backgroundColor: theme.colors.borderLight }]} />}
                   </View>
+
                   <View style={styles.timelineContent}>
                     <View style={styles.timelineHeader}>
                       <Text style={[styles.timelineStatusText, { color: isLast ? theme.colors.primary : theme.colors.text, fontWeight: isLast ? "700" : "600" }]}>
@@ -301,8 +304,11 @@ export const CustomerJobDetailsScreen = () => {
               );
             })
           ) : (
-            <View style={{ alignItems: "center", padding: 20 }}>
-              <Text style={{ color: theme.colors.textMuted }}>No history logs yet</Text>
+            <View style={{ alignItems: "center", paddingVertical: 24 }}>
+              <Clock size={28} color={theme.colors.textLight} />
+              <Text style={{ fontSize: 13, color: theme.colors.textMuted, marginTop: 8 }}>
+                No status history available yet.
+              </Text>
             </View>
           )}
         </View>
@@ -412,6 +418,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
     marginBottom: 8,
+    lineHeight: 22,
   },
   desc: {
     fontSize: 14,
@@ -583,4 +590,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default CustomerJobDetailsScreen;
+export default CustomerTicketDetailsScreen;

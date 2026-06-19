@@ -11,6 +11,7 @@ interface AppHeaderProps {
   showBack?: boolean;
   onBackPress?: () => void;
   rightAction?: React.ReactNode;
+  leftAction?: React.ReactNode;
   showTenantBranding?: boolean;
 }
 
@@ -20,6 +21,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   showBack = false,
   onBackPress,
   rightAction,
+  leftAction,
   showTenantBranding = true,
 }) => {
   const theme = useTheme();
@@ -38,6 +40,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       ]}
     >
       <View style={styles.contentRow}>
+        {leftAction && <View style={styles.leftActionContainer}>{leftAction}</View>}
+
         {showBack ? (
           <Pressable
             onPress={onBackPress}
@@ -171,6 +175,11 @@ const styles = StyleSheet.create({
   },
   rightActionPlaceholder: {
     width: 40,
+  },
+  leftActionContainer: {
+    justifyContent: "center",
+    alignItems: "flex-start",
+    marginRight: 6,
   },
 });
 export default AppHeader;

@@ -16,6 +16,16 @@ export type AuthStackParamList = {
 export type CustomerStackParamList = {
   CustomerHome: undefined;
   CustomerJobDetails: { jobId: string };
+  CustomerDashboard: undefined;
+  RaiseTicket: undefined;
+  TicketHistory: undefined;
+  CustomerTicketDetails: { ticketId: string };
+  LiveTracking: { ticketId: string; ticketNumber?: string };
+  PaymentHistory: undefined;
+  InvoiceList: undefined;
+  InvoiceDetails: { invoiceId: string };
+  Feedback: { ticketId: string; ticketNumber: string };
+  AddressBook: { onSelectAddress?: (addressText: string, lat: number, lng: number) => void } | undefined;
 };
 
 export type TechnicianStackParamList = {

@@ -5,9 +5,13 @@ import {
   StyleSheet,
   ScrollView,
   Pressable,
+  RefreshControl,
+  Modal,
+  Animated,
+  Dimensions,
   Alert,
-  TextInput,
-  Image,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -18,10 +22,16 @@ import {
   User,
   Plus,
   FileText,
-  Activity,
   ClipboardList,
-  AlertCircle,
-  Camera,
+  MapPin,
+  CreditCard,
+  X,
+  Mail,
+  Phone,
+  Smartphone,
+  Building,
+  Hash,
+  Menu,
 } from "lucide-react-native";
 
 import { useTheme } from "../../theme";
@@ -29,9 +39,10 @@ import { useAuthStore } from "../../store/auth.store";
 import {
   useCustomerTickets,
   useCustomerInvoices,
-  useRaiseTicket,
-} from "../../hooks/useJobs";
-import { mapToCustomerStatus } from "../../mock/data";
+  useCustomerProfile,
+  useUpdateCustomerProfile,
+  useCustomerPayments,
+} from "../../hooks/useCustomer";
 import { CustomerStackParamList } from "../../types/navigation.types";
 import { AppHeader } from "../../components/AppHeader";
 import { AppLoader } from "../../components/AppLoader";
@@ -40,93 +51,185 @@ import { AppCard } from "../../components/AppCard";
 import { AppBadge } from "../../components/AppBadge";
 import { AppButton } from "../../components/AppButton";
 import { AppInput } from "../../components/AppInput";
+import { CustomerPopup } from "../../components/CustomerPopup";
 
 type NavigationProp = NativeStackNavigationProp<CustomerStackParamList, "CustomerHome">;
-type CustomerTab = "TICKETS" | "RAISE_TICKET" | "INVOICES" | "PROFILE";
+type CustomerTab = "TICKETS" | "INVOICES" | "PROFILE" | "PAYMENTS";
 
 export const CustomerHomeScreen = () => {
   const theme = useTheme();
   const navigation = useNavigation<NavigationProp>();
   const { user, logout } = useAuthStore();
 
-  const customerMobile = user?.mobile || "";
-  const { data: tickets = [], isLoading: isTicketsLoading, refetch: refetchTickets } = useCustomerTickets(customerMobile);
-  const { data: invoices = [], isLoading: isInvoicesLoading, refetch: refetchInvoices } = useCustomerInvoices(customerMobile);
-  const raiseTicketMutation = useRaiseTicket();
-
   const [activeTab, setActiveTab] = useState<CustomerTab>("TICKETS");
+  const [logoutPopupVisible, setLogoutPopupVisible] = useState(false);
+  const [drawerVisible, setDrawerVisible] = useState(false);
 
-  // Form State
-  const [category, setCategory] = useState("Appliance Repair");
-  const [subCategory, setSubCategory] = useState("AC Service");
-  const [description, setDescription] = useState("");
-  const [address, setAddress] = useState("Flat 402, Royal Residency, Sector 62, Noida");
-  const [images, setImages] = useState<string[]>([]);
+  // Queries
+  const { data: tickets = [], isLoading: isTicketsLoading, refetch: refetchTickets, isFetching: isFetchingTickets } = useCustomerTickets();
+  const { data: invoices = [], isLoading: isInvoicesLoading, refetch: refetchInvoices, isFetching: isFetchingInvoices } = useCustomerInvoices();
+  const { data: payments = [], isLoading: isPaymentsLoading, refetch: refetchPayments, isFetching: isFetchingPayments } = useCustomerPayments();
+  const { data: profile, isLoading: isProfileLoading, refetch: refetchProfile } = useCustomerProfile();
+  const updateProfileMutation = useUpdateCustomerProfile();
 
-  const handleRaiseTicket = async () => {
-    if (!description.trim()) {
-      Alert.alert("Required", "Please describe your issue.");
-      return;
+  // Form states
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [alternatePhone, setAlternatePhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [city, setCity] = useState("");
+  const [pincode, setPincode] = useState("");
+
+  // Sync form states with profile data
+  React.useEffect(() => {
+    if (profile) {
+      setName(profile.name || "");
+      setEmail(profile.email || "");
+      setPhone(profile.phone || "");
+      setAlternatePhone(profile.alternatePhone || "");
+      setAddress(profile.address || "");
+      setCity(profile.city || "");
+      setPincode(profile.pincode || "");
     }
-    if (!address.trim()) {
-      Alert.alert("Required", "Please provide a service location address.");
-      return;
-    }
+  }, [profile]);
 
-    try {
-      await raiseTicketMutation.mutateAsync({
-        customerName: user?.name || "Client",
-        customerMobile,
-        category,
-        subCategory,
-        description,
-        address,
-        images,
-      });
+  const screenWidth = Dimensions.get("window").width;
+  const drawerWidth = screenWidth * 0.85;
 
-      // Reset form
-      setDescription("");
-      setImages([]);
-      Alert.alert("Ticket Raised", "Your service request has been logged successfully.");
-      setActiveTab("TICKETS");
-    } catch (err: any) {
-      Alert.alert("Error", err.message || "Failed to submit request.");
-    }
+  const [slideAnim] = useState(new Animated.Value(-drawerWidth));
+
+  const openDrawer = () => {
+    setDrawerVisible(true);
+    Animated.timing(slideAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
   };
 
-  const simulateAddImage = () => {
-    setImages(["https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=200"]);
-    Alert.alert("Photo Attached", "Simulated issue photo attached.");
+  const closeDrawer = () => {
+    Animated.timing(slideAnim, {
+      toValue: -drawerWidth,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => {
+      setDrawerVisible(false);
+    });
+  };
+
+  const handleSaveProfile = () => {
+    updateProfileMutation.mutate(
+      {
+        name,
+        email: email || null,
+        phone,
+        alternatePhone: alternatePhone || null,
+        address: address || null,
+        city: city || null,
+        pincode: pincode || null,
+      },
+      {
+        onSuccess: () => {
+          Alert.alert("Success", "Profile updated successfully!");
+        },
+        onError: (err: any) => {
+          Alert.alert("Error", err.message || "Failed to update profile");
+        }
+      }
+    );
   };
 
   const getStatusVariant = (status: string) => {
-    const customerStatus = mapToCustomerStatus(status as any);
-    switch (customerStatus) {
+    switch (status) {
       case "COMPLETED":
-      case "CLOSED":
+      case "TICKET_CLOSED":
         return "success";
-      case "WORK IN PROGRESS":
-      case "TECHNICIAN ASSIGNED":
-      case "TECHNICIAN EN ROUTE":
+      case "IN_PROGRESS":
+      case "ASSIGNED":
+      case "ACCEPTED":
+      case "TRAVELLING":
+      case "REACHED_LOCATION":
         return "warning";
-      case "PENDING":
-      case "RESCHEDULED":
+      case "CANCELLED":
         return "danger";
       default:
         return "primary";
     }
   };
 
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "NEW_TICKET":
+        return "NEW";
+      case "REACHED_LOCATION":
+        return "ARRIVED";
+      case "TRAVELLING":
+        return "EN ROUTE";
+      case "TICKET_CLOSED":
+        return "CLOSED";
+      default:
+        return status.replace("_", " ");
+    }
+  };
+
+  const getPaymentStatusVariant = (status: string) => {
+    const s = status.toUpperCase();
+    if (s === "PAID" || s === "COMPLETED" || s === "SUCCESS") return "success";
+    if (s === "PENDING" || s === "PROCESSING") return "warning";
+    return "danger";
+  };
+
+  const formatDate = (dateStr: string) => {
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const getActiveTabTitle = () => {
+    switch (activeTab) {
+      case "PROFILE":
+        return "My Account Profile";
+      case "INVOICES":
+        return "My Invoices";
+      case "PAYMENTS":
+        return "Payment Transactions";
+      default:
+        return "Service History";
+    }
+  };
+
+  const handleRefresh = () => {
+    if (activeTab === "TICKETS") refetchTickets();
+    else if (activeTab === "INVOICES") refetchInvoices();
+    else if (activeTab === "PAYMENTS") refetchPayments();
+    else refetchProfile();
+  };
+
+  const isRefreshing = () => {
+    if (activeTab === "TICKETS") return isFetchingTickets;
+    if (activeTab === "INVOICES") return isFetchingInvoices;
+    if (activeTab === "PAYMENTS") return isFetchingPayments;
+    return isProfileLoading;
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <AppHeader
         showTenantBranding
-        rightAction={
+        leftAction={
           <Pressable
-            onPress={logout}
+            onPress={openDrawer}
             style={({ pressed }) => [styles.logoutButton, pressed && { opacity: 0.7 }]}
           >
-            <LogOut color={theme.colors.danger} size={20} />
+            <Menu color={theme.colors.text} size={24} />
           </Pressable>
         }
       />
@@ -142,101 +245,253 @@ export const CustomerHomeScreen = () => {
           },
         ]}
       >
-        <View style={[styles.avatarCircle, { backgroundColor: `${theme.colors.primary}15` }]}>
+        <View
+          style={[
+            styles.avatarCircle,
+            { backgroundColor: `${theme.colors.primary}15` }
+          ]}
+        >
           <User color={theme.colors.primary} size={24} />
         </View>
         <View style={styles.profileText}>
-          <Text style={[styles.welcomeText, { color: theme.colors.textMuted, fontSize: theme.typography.fontSize.xs }]}>
-            Customer Account
-          </Text>
-          <Text
+          <View>
+            <Text style={[styles.welcomeText, { color: theme.colors.textMuted, fontSize: theme.typography.fontSize.xs }]}>
+              Customer Account
+            </Text>
+            <Text
+              style={[
+                styles.nameText,
+                {
+                  color: theme.colors.text,
+                  fontSize: theme.typography.fontSize.md,
+                  fontWeight: theme.typography.fontWeight.semibold,
+                },
+              ]}
+            >
+              {profile?.name || user?.name || "Customer"}
+            </Text>
+          </View>
+        </View>
+
+        <Pressable
+          onPress={() => navigation.navigate("RaiseTicket")}
+          style={({ pressed }) => [
+            styles.topRaiseTicketBtn,
+            { backgroundColor: `${theme.colors.primary}12` },
+            pressed && { opacity: 0.7 }
+          ]}
+        >
+          <Plus size={14} color={theme.colors.primary} style={{ marginRight: 4 }} />
+          <Text style={[styles.topRaiseTicketText, { color: theme.colors.primary }]}>Raise Ticket</Text>
+        </Pressable>
+      </View>
+
+      {/* Reusable Customer Logout Popup */}
+      <CustomerPopup
+        visible={logoutPopupVisible}
+        type="warning"
+        title="Logout Confirmation"
+        message="Are you sure you want to logout?"
+        confirmText="OK"
+        cancelText="Cancel"
+        onConfirm={() => {
+          setLogoutPopupVisible(false);
+          logout();
+        }}
+        onCancel={() => setLogoutPopupVisible(false)}
+      />
+
+      {/* Left Sidebar Profile Drawer */}
+      <Modal
+        transparent
+        visible={drawerVisible}
+        onRequestClose={closeDrawer}
+        animationType="none"
+      >
+        <View style={styles.drawerOverlay}>
+          <Pressable style={styles.backdropPressable} onPress={closeDrawer} />
+          
+          <Animated.View
             style={[
-              styles.nameText,
+              styles.drawerContent,
               {
-                color: theme.colors.text,
-                fontSize: theme.typography.fontSize.md,
-                fontWeight: theme.typography.fontWeight.semibold,
+                width: drawerWidth,
+                transform: [{ translateX: slideAnim }],
+                backgroundColor: theme.colors.card,
               },
             ]}
           >
-            {user?.name} ({user?.mobile})
-          </Text>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === "ios" ? "padding" : "height"}
+              style={{ flex: 1 }}
+            >
+              <View style={[styles.drawerHeader, { borderBottomColor: theme.colors.borderLight }]}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                  <View style={[styles.drawerAvatarCircle, { backgroundColor: `${theme.colors.primary}15` }]}>
+                    <User color={theme.colors.primary} size={20} />
+                  </View>
+                  <Text style={[styles.drawerTitle, { color: theme.colors.text }]}>Menu</Text>
+                </View>
+                <Pressable onPress={closeDrawer} style={styles.closeBtn}>
+                  <X size={20} color={theme.colors.textMuted} />
+                </Pressable>
+              </View>
+
+              <View style={styles.menuContainer}>
+                <ScrollView
+                  style={styles.drawerScroll}
+                  contentContainerStyle={styles.drawerScrollContent}
+                  showsVerticalScrollIndicator={false}
+                >
+                  <Pressable
+                    onPress={() => {
+                      setActiveTab("PROFILE");
+                      closeDrawer();
+                    }}
+                    style={({ pressed }) => [
+                      styles.menuItemRow,
+                      activeTab === "PROFILE" && { backgroundColor: `${theme.colors.primary}08` },
+                      pressed && { opacity: 0.7 }
+                    ]}
+                  >
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                      <User size={20} color={activeTab === "PROFILE" ? theme.colors.primary : theme.colors.textMuted} />
+                      <Text style={[styles.menuItemLabel, { color: activeTab === "PROFILE" ? theme.colors.primary : theme.colors.text }]}>My Profile</Text>
+                    </View>
+                    <ChevronRight size={18} color={theme.colors.textMuted} />
+                  </Pressable>
+
+                  <Pressable
+                    onPress={() => {
+                      setActiveTab("TICKETS");
+                      closeDrawer();
+                    }}
+                    style={({ pressed }) => [
+                      styles.menuItemRow,
+                      activeTab === "TICKETS" && { backgroundColor: `${theme.colors.primary}08` },
+                      pressed && { opacity: 0.7 }
+                    ]}
+                  >
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                      <ClipboardList size={20} color={activeTab === "TICKETS" ? theme.colors.primary : theme.colors.textMuted} />
+                      <Text style={[styles.menuItemLabel, { color: activeTab === "TICKETS" ? theme.colors.primary : theme.colors.text }]}>Service History</Text>
+                    </View>
+                    <ChevronRight size={18} color={theme.colors.textMuted} />
+                  </Pressable>
+
+                  <Pressable
+                    onPress={() => {
+                      setActiveTab("PAYMENTS");
+                      closeDrawer();
+                    }}
+                    style={({ pressed }) => [
+                      styles.menuItemRow,
+                      activeTab === "PAYMENTS" && { backgroundColor: `${theme.colors.primary}08` },
+                      pressed && { opacity: 0.7 }
+                    ]}
+                  >
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                      <CreditCard size={20} color={activeTab === "PAYMENTS" ? theme.colors.primary : theme.colors.textMuted} />
+                      <Text style={[styles.menuItemLabel, { color: activeTab === "PAYMENTS" ? theme.colors.primary : theme.colors.text }]}>Payment History</Text>
+                    </View>
+                    <ChevronRight size={18} color={theme.colors.textMuted} />
+                  </Pressable>
+
+                  <Pressable
+                    onPress={() => {
+                      setActiveTab("INVOICES");
+                      closeDrawer();
+                    }}
+                    style={({ pressed }) => [
+                      styles.menuItemRow,
+                      activeTab === "INVOICES" && { backgroundColor: `${theme.colors.primary}08` },
+                      pressed && { opacity: 0.7 }
+                    ]}
+                  >
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                      <FileText size={20} color={activeTab === "INVOICES" ? theme.colors.primary : theme.colors.textMuted} />
+                      <Text style={[styles.menuItemLabel, { color: activeTab === "INVOICES" ? theme.colors.primary : theme.colors.text }]}>Invoice List</Text>
+                    </View>
+                    <ChevronRight size={18} color={theme.colors.textMuted} />
+                  </Pressable>
+
+                  <Pressable
+                    onPress={() => {
+                      closeDrawer();
+                      navigation.navigate("AddressBook");
+                    }}
+                    style={({ pressed }) => [styles.menuItemRow, pressed && { opacity: 0.7 }]}
+                  >
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                      <MapPin size={20} color={theme.colors.textMuted} />
+                      <Text style={[styles.menuItemLabel, { color: theme.colors.text }]}>Manage Address Book</Text>
+                    </View>
+                    <ChevronRight size={18} color={theme.colors.textMuted} />
+                  </Pressable>
+                </ScrollView>
+
+                <View style={[styles.drawerFooter, { borderTopColor: theme.colors.borderLight }]}>
+                  <Pressable
+                    onPress={() => {
+                      closeDrawer();
+                      setLogoutPopupVisible(true);
+                    }}
+                    style={({ pressed }) => [
+                      styles.drawerLogoutBtn,
+                      { borderColor: theme.colors.danger },
+                      pressed && { opacity: 0.7 }
+                    ]}
+                  >
+                    <LogOut size={18} color={theme.colors.danger} />
+                    <Text style={[styles.drawerLogoutText, { color: theme.colors.danger }]}>Logout</Text>
+                  </Pressable>
+                </View>
+              </View>
+            </KeyboardAvoidingView>
+          </Animated.View>
         </View>
-      </View>
+      </Modal>
 
-      {/* Bottom Tabs Selection */}
-      <View style={[styles.navigationGrid, { backgroundColor: theme.colors.card, borderBottomWidth: 1, borderBottomColor: theme.colors.borderLight }]}>
-        <Pressable
-          onPress={() => setActiveTab("TICKETS")}
-          style={[styles.navItem, activeTab === "TICKETS" && { borderBottomColor: theme.colors.primary }]}
-        >
-          <ClipboardList size={18} color={activeTab === "TICKETS" ? theme.colors.primary : theme.colors.textMuted} />
-          <Text style={[styles.navLabel, { color: activeTab === "TICKETS" ? theme.colors.primary : theme.colors.textMuted }]}>
-            My Tickets
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={() => setActiveTab("RAISE_TICKET")}
-          style={[styles.navItem, activeTab === "RAISE_TICKET" && { borderBottomColor: theme.colors.primary }]}
-        >
-          <Plus size={18} color={activeTab === "RAISE_TICKET" ? theme.colors.primary : theme.colors.textMuted} />
-          <Text style={[styles.navLabel, { color: activeTab === "RAISE_TICKET" ? theme.colors.primary : theme.colors.textMuted }]}>
-            Raise Ticket
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={() => setActiveTab("INVOICES")}
-          style={[styles.navItem, activeTab === "INVOICES" && { borderBottomColor: theme.colors.primary }]}
-        >
-          <FileText size={18} color={activeTab === "INVOICES" ? theme.colors.primary : theme.colors.textMuted} />
-          <Text style={[styles.navLabel, { color: activeTab === "INVOICES" ? theme.colors.primary : theme.colors.textMuted }]}>
-            Invoices
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={() => setActiveTab("PROFILE")}
-          style={[styles.navItem, activeTab === "PROFILE" && { borderBottomColor: theme.colors.primary }]}
-        >
-          <User size={18} color={activeTab === "PROFILE" ? theme.colors.primary : theme.colors.textMuted} />
-          <Text style={[styles.navLabel, { color: activeTab === "PROFILE" ? theme.colors.primary : theme.colors.textMuted }]}>
-            Profile
-          </Text>
-        </Pressable>
-      </View>
+      {/* Main Content View below header & Customer Account Banner */}
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing()}
+            onRefresh={handleRefresh}
+            tintColor={theme.colors.primary}
+          />
+        }
+      >
+        <View style={styles.tabHeader}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>{getActiveTabTitle()}</Text>
+        </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {activeTab === "TICKETS" && (
           <View>
-            <View style={styles.tabHeader}>
-              <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>Service History</Text>
-              <AppButton
-                title="Raise New Ticket"
-                onPress={() => setActiveTab("RAISE_TICKET")}
-                size="sm"
-                icon={<Plus size={12} color="#ffffff" style={{ marginRight: 2 }} />}
-              />
-            </View>
-
             {isTicketsLoading ? (
               <AppLoader message="Retrieving requests..." />
             ) : tickets.length === 0 ? (
               <AppEmptyState
                 title="No Active Requests"
-                description="You haven't logged any service tickets yet. Click above to raise your first AC/appliance support request."
+                description="You haven't logged any service tickets yet. Tapping Raise Ticket at the top right to request appliance support."
               />
             ) : (
               tickets.map((item) => (
                 <AppCard
-                  key={item.ticketNo}
-                  onPress={() => navigation.navigate("CustomerJobDetails", { jobId: item.ticketNo })}
+                  key={item.id}
+                  onPress={() => navigation.navigate("CustomerJobDetails", { jobId: item.id })}
                   style={styles.ticketCard}
                 >
                   <View style={styles.cardHeader}>
-                    <Text style={[styles.ticketId, { color: theme.colors.textMuted }]}>{item.ticketNo}</Text>
-                    <AppBadge label={mapToCustomerStatus(item.status)} variant={getStatusVariant(item.status)} />
+                    <Text style={[styles.ticketId, { color: theme.colors.textMuted }]}>{item.ticketNumber}</Text>
+                    <AppBadge label={getStatusLabel(item.status)} variant={getStatusVariant(item.status)} />
                   </View>
 
-                  <Text style={[styles.cardTitle, { color: theme.colors.text }]}>{item.service}</Text>
+                  <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
+                    {item.subCategory?.name || "—"}
+                  </Text>
                   <Text style={{ color: theme.colors.textMuted, fontSize: 13, marginBottom: 12 }} numberOfLines={2}>
                     {item.description}
                   </Text>
@@ -247,11 +502,11 @@ export const CustomerHomeScreen = () => {
                     <View style={styles.timeInfo}>
                       <Calendar size={14} color={theme.colors.textMuted} style={{ marginRight: 4 }} />
                       <Text style={{ fontSize: 12, color: theme.colors.textMuted }}>
-                        Scheduled: {item.scheduledDate}
+                        Date: {formatDate(item.createdAt)}
                       </Text>
                     </View>
                     <View style={styles.actionLink}>
-                      <Text style={{ fontSize: 12, color: theme.colors.primary, fontWeight: "700" }}>Track Ticket</Text>
+                      <Text style={{ fontSize: 12, color: theme.colors.primary, fontWeight: "700" }}>Details</Text>
                       <ChevronRight size={14} color={theme.colors.primary} />
                     </View>
                   </View>
@@ -261,49 +516,8 @@ export const CustomerHomeScreen = () => {
           </View>
         )}
 
-        {activeTab === "RAISE_TICKET" && (
-          <View>
-            <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>Raise Support Ticket</Text>
-            <AppCard style={styles.formCard}>
-              <AppInput label="Category" value={category} onChangeText={setCategory} />
-              <AppInput label="Sub Category" value={subCategory} onChangeText={setSubCategory} />
-              <AppInput
-                label="Problem Description"
-                placeholder="Describe details like error codes, rattling noise, leak issues..."
-                value={description}
-                onChangeText={setDescription}
-                multiline
-                numberOfLines={4}
-              />
-              <AppInput label="Service Address" value={address} onChangeText={setAddress} />
-
-              <Text style={styles.formLabel}>Attach Problem Images</Text>
-              <View style={styles.photoContainer}>
-                {images.length > 0 ? (
-                  images.map((img, idx) => (
-                    <Image key={idx} source={{ uri: img }} style={styles.thumbnail} />
-                  ))
-                ) : (
-                  <Pressable onPress={simulateAddImage} style={styles.uploadBtn}>
-                    <Camera size={24} color={theme.colors.primary} />
-                    <Text style={{ fontSize: 11, color: theme.colors.primary, marginTop: 4 }}>Add Image</Text>
-                  </Pressable>
-                )}
-              </View>
-
-              <AppButton
-                title="Submit Support Request"
-                onPress={handleRaiseTicket}
-                loading={raiseTicketMutation.isPending}
-                style={{ marginTop: 12 }}
-              />
-            </AppCard>
-          </View>
-        )}
-
         {activeTab === "INVOICES" && (
           <View>
-            <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>My Invoices</Text>
             {isInvoicesLoading ? (
               <AppLoader message="Retrieving invoices..." />
             ) : invoices.length === 0 ? (
@@ -313,13 +527,17 @@ export const CustomerHomeScreen = () => {
               />
             ) : (
               invoices.map((inv) => (
-                <AppCard key={inv.invoiceNo} style={styles.ticketCard}>
+                <AppCard
+                  key={inv.id}
+                  style={styles.ticketCard}
+                  onPress={() => navigation.navigate("InvoiceDetails", { invoiceId: inv.id })}
+                >
                   <View style={styles.cardHeader}>
-                    <Text style={[styles.ticketId, { color: theme.colors.textMuted }]}>{inv.invoiceNo}</Text>
-                    <AppBadge label={inv.paymentStatus} variant="success" />
+                    <Text style={[styles.ticketId, { color: theme.colors.textMuted }]}>{inv.invoiceNumber}</Text>
+                    <AppBadge label={inv.payment?.status || "UNPAID"} variant="success" />
                   </View>
                   <Text style={[styles.invoiceTitle, { color: theme.colors.text }]}>
-                    Ticket Ref: <Text style={{ fontWeight: "700" }}>{inv.ticketNo}</Text>
+                    Ticket Ref: <Text style={{ fontWeight: "700" }}>{inv.ticket?.ticketNumber || "—"}</Text>
                   </Text>
                   <View style={styles.invoiceBreakdown}>
                     <View style={styles.breakdownRow}>
@@ -332,7 +550,7 @@ export const CustomerHomeScreen = () => {
                     </View>
                     <View style={[styles.divider, { backgroundColor: theme.colors.borderLight }]} />
                     <View style={styles.breakdownRow}>
-                      <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: "700" }}>Total Paid:</Text>
+                      <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: "700" }}>Total:</Text>
                       <Text style={{ color: theme.colors.primary, fontSize: 14, fontWeight: "700" }}>₹{inv.total}</Text>
                     </View>
                   </View>
@@ -342,28 +560,154 @@ export const CustomerHomeScreen = () => {
           </View>
         )}
 
-        {activeTab === "PROFILE" && (
+        {activeTab === "PAYMENTS" && (
           <View>
-            <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>My Account Profile</Text>
-            <AppCard style={styles.formCard}>
-              <View style={styles.profileDetailRow}>
-                <Text style={[styles.profileLabel, { color: theme.colors.textLight }]}>Name:</Text>
-                <Text style={[styles.profileValue, { color: theme.colors.text }]}>{user?.name}</Text>
-              </View>
-              <View style={styles.profileDetailRow}>
-                <Text style={[styles.profileLabel, { color: theme.colors.textLight }]}>Mobile:</Text>
-                <Text style={[styles.profileValue, { color: theme.colors.text }]}>{user?.mobile}</Text>
-              </View>
-              <View style={styles.profileDetailRow}>
-                <Text style={[styles.profileLabel, { color: theme.colors.textLight }]}>Role Access:</Text>
-                <Text style={[styles.profileValue, { color: theme.colors.text }]}>{user?.role}</Text>
-              </View>
-              <View style={styles.profileDetailRow}>
-                <Text style={[styles.profileLabel, { color: theme.colors.textLight }]}>Default Address:</Text>
-                <Text style={[styles.profileValue, { color: theme.colors.text, flex: 1 }]}>{address}</Text>
-              </View>
-            </AppCard>
+            {isPaymentsLoading ? (
+              <AppLoader message="Retrieving transactions..." />
+            ) : payments.length === 0 ? (
+              <AppEmptyState
+                title="No transaction records found"
+                description="Your service payment records will be documented here once transaction processes."
+              />
+            ) : (
+              payments.map((item) => (
+                <AppCard
+                  key={item.id}
+                  style={styles.ticketCard}
+                  onPress={() => {
+                    if (item.invoice?.invoiceNumber) {
+                      navigation.navigate("InvoiceDetails", { invoiceId: item.id });
+                    }
+                  }}
+                >
+                  <View style={styles.cardHeader}>
+                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                      <Text style={[styles.label, { color: theme.colors.textMuted }]}>Payment ID</Text>
+                      <Text style={[styles.valueId, { color: theme.colors.text }]}>: {item.id.substring(0, 8).toUpperCase()}</Text>
+                    </View>
+                    <AppBadge label={item.status} variant={getPaymentStatusVariant(item.status)} />
+                  </View>
+
+                  <View style={styles.detailRow}>
+                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                      <Text style={[styles.label, { color: theme.colors.textMuted }]}>Ticket Number</Text>
+                      <Text style={[styles.value, { color: theme.colors.text }]}>: {item.invoice?.invoiceNumber || "—"}</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.detailRow}>
+                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                      <Text style={[styles.label, { color: theme.colors.textMuted }]}>Amount</Text>
+                      <Text style={[styles.valueAmount, { color: theme.colors.primary }]}>: ₹{item.amount}</Text>
+                    </View>
+                  </View>
+
+                  <View style={[styles.divider, { backgroundColor: theme.colors.borderLight }]} />
+
+                  <View style={styles.cardFooter}>
+                    <View style={styles.timeInfo}>
+                      <Calendar size={14} color={theme.colors.textMuted} style={{ marginRight: 4 }} />
+                      <Text style={{ fontSize: 10, color: theme.colors.textMuted }}>Date</Text>
+                      <Text style={{ fontSize: 12, color: theme.colors.text, fontWeight: "600" }}>
+                        : {formatDate(item.createdAt)}
+                      </Text>
+                    </View>
+                    {item.invoice?.invoiceNumber ? (
+                      <View style={styles.actionLink}>
+                        <Text style={{ fontSize: 12, color: theme.colors.primary, fontWeight: "700" }}>Invoice</Text>
+                        <ChevronRight size={14} color={theme.colors.primary} />
+                      </View>
+                    ) : null}
+                  </View>
+                </AppCard>
+              ))
+            )}
           </View>
+        )}
+
+        {activeTab === "PROFILE" && (
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={{ flex: 1 }}
+          >
+            <AppCard style={styles.formCard}>
+              <Text style={[styles.drawerSectionTitle, { color: theme.colors.textMuted, marginBottom: 16 }]}>Profile Details</Text>
+              
+              <AppInput
+                label="Name"
+                value={name}
+                onChangeText={setName}
+                placeholder="Enter your name"
+                leftIcon={<User size={16} color={theme.colors.textMuted} />}
+              />
+
+              <AppInput
+                label="Email Address"
+                value={email}
+                onChangeText={setEmail}
+                placeholder="Enter email address"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                leftIcon={<Mail size={16} color={theme.colors.textMuted} />}
+              />
+
+              <AppInput
+                label="Primary Phone"
+                value={phone}
+                onChangeText={setPhone}
+                placeholder="Enter mobile phone number"
+                keyboardType="phone-pad"
+                editable={false}
+                leftIcon={<Smartphone size={16} color={theme.colors.textMuted} />}
+                style={{ opacity: 0.6 }}
+              />
+
+              <AppInput
+                label="Alternate Phone"
+                value={alternatePhone}
+                onChangeText={setAlternatePhone}
+                placeholder="Enter alternate phone number"
+                keyboardType="phone-pad"
+                leftIcon={<Phone size={16} color={theme.colors.textMuted} />}
+              />
+
+              <View style={[styles.divider, { backgroundColor: theme.colors.borderLight, marginVertical: 16 }]} />
+
+              <Text style={[styles.drawerSectionTitle, { color: theme.colors.textMuted, marginBottom: 16 }]}>Address Details</Text>
+              
+              <AppInput
+                label="Address"
+                value={address}
+                onChangeText={setAddress}
+                placeholder="Enter street address"
+                leftIcon={<MapPin size={16} color={theme.colors.textMuted} />}
+              />
+
+              <AppInput
+                label="City"
+                value={city}
+                onChangeText={setCity}
+                placeholder="Enter city"
+                leftIcon={<Building size={16} color={theme.colors.textMuted} />}
+              />
+
+              <AppInput
+                label="Pincode"
+                value={pincode}
+                onChangeText={setPincode}
+                placeholder="Enter pincode"
+                keyboardType="numeric"
+                leftIcon={<Hash size={16} color={theme.colors.textMuted} />}
+              />
+
+              <AppButton
+                title="Save Changes"
+                onPress={handleSaveProfile}
+                loading={updateProfileMutation.isPending}
+                style={{ marginTop: 24 }}
+              />
+            </AppCard>
+          </KeyboardAvoidingView>
         )}
       </ScrollView>
     </View>
@@ -399,22 +743,6 @@ const styles = StyleSheet.create({
   },
   nameText: {
     marginTop: 1,
-  },
-  navigationGrid: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  navItem: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 12,
-    borderBottomWidth: 3,
-    borderBottomColor: "transparent",
-    gap: 4,
-  },
-  navLabel: {
-    fontSize: 10,
-    fontWeight: "700",
   },
   scrollContent: {
     padding: 16,
@@ -468,36 +796,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-  formCard: {
-    padding: 16,
-  },
-  formLabel: {
-    fontSize: 11,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    color: "#64748b",
-    marginBottom: 8,
-    marginTop: 8,
-  },
-  photoContainer: {
-    flexDirection: "row",
-    marginBottom: 16,
-  },
-  thumbnail: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-  },
-  uploadBtn: {
-    width: 80,
-    height: 80,
-    borderWidth: 1,
-    borderStyle: "dashed",
-    borderColor: "#cbd5e1",
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   invoiceTitle: {
     fontSize: 14,
     marginBottom: 8,
@@ -509,18 +807,149 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
   },
-  profileDetailRow: {
+  topRaiseTicketBtn: {
     flexDirection: "row",
-    marginBottom: 12,
-    gap: 8,
+    alignItems: "center",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    alignSelf: "center",
   },
-  profileLabel: {
-    fontSize: 13,
+  topRaiseTicketText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  drawerOverlay: {
+    flex: 1,
+    flexDirection: "row",
+  },
+  backdropPressable: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+  },
+  drawerContent: {
+    height: "100%",
+    shadowColor: "#000",
+    shadowOffset: { width: 4, height: 0 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 16,
+  },
+  drawerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === "ios" ? 50 : 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+  },
+  drawerAvatarCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  drawerTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  closeBtn: {
+    padding: 6,
+  },
+  drawerScroll: {
+    flex: 1,
+  },
+  drawerScrollContent: {
+    padding: 16,
+    paddingBottom: 40,
+  },
+  drawerSection: {
+    gap: 12,
+  },
+  drawerSectionTitle: {
+    fontSize: 11,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 8,
+  },
+  addressBookItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 12,
+    borderRadius: 8,
+    marginVertical: 8,
+  },
+  addressBookText: {
+    fontSize: 14,
     fontWeight: "600",
-    minWidth: 120,
   },
-  profileValue: {
+  menuContainer: {
+    flex: 1,
+    justifyContent: "space-between",
+  },
+  menuItemRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f1f5f9",
+  },
+  menuItemLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  drawerFooter: {
+    padding: 16,
+    borderTopWidth: 1,
+  },
+  drawerLogoutBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderWidth: 1.5,
+    borderRadius: 8,
+    paddingVertical: 12,
+    width: "100%",
+  },
+  drawerLogoutText: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  formCard: {
+    padding: 16,
+  },
+  label: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  valueId: {
     fontSize: 13,
     fontWeight: "700",
   },
+  detailRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  value: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  valueAmount: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
 });
+
+export default CustomerHomeScreen;
