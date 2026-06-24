@@ -239,7 +239,24 @@ export const RaiseTicketScreen = () => {
     if (!selectedCat) newErrors.category = "Category is required";
     if (!selectedSub) newErrors.subCategory = "Sub Category is required";
     if (!description.trim()) newErrors.description = "Description is required";
-    if (!preferredDate || !preferredTimeSlot) newErrors.preferredDate = "Visit Date and Time slot are required";
+    if (!preferredDate || !preferredTimeSlot) {
+      newErrors.preferredDate = "Visit Date and Time slot are required";
+    } else {
+      const isToday = preferredDate.toDateString() === new Date().toDateString();
+      if (isToday) {
+        const [timePart] = preferredTimeSlot.split(" - ");
+        const [hhmm, ampm] = timePart.split(" ");
+        let [hours, minutes] = hhmm.split(":").map(Number);
+        if (ampm === "PM" && hours !== 12) hours += 12;
+        if (ampm === "AM" && hours === 12) hours = 0;
+        const now = new Date();
+        const selectedTimeVal = hours * 60 + minutes;
+        const currentTimeVal = now.getHours() * 60 + now.getMinutes();
+        if (selectedTimeVal < currentTimeVal) {
+          newErrors.preferredDate = "Visit time cannot be in the past";
+        }
+      }
+    }
     if (!address.trim()) newErrors.address = "Address is required";
     if (images.length === 0) newErrors.images = "At least 1 photo or video is required";
     if (!imageNotes.trim()) newErrors.imageNotes = "Media notes are required";
@@ -1050,6 +1067,21 @@ export const RaiseTicketScreen = () => {
                   style={[styles.modalActionBtn, styles.modalActionBtnOk, { backgroundColor: theme.colors.primary }]}
                   onPress={() => {
                     if (tempDate) {
+                      const isToday = tempDate.toDateString() === new Date().toDateString();
+                      if (isToday && preferredTimeSlot) {
+                        const [timePart] = preferredTimeSlot.split(" - ");
+                        const [hhmm, ampm] = timePart.split(" ");
+                        let [hours, minutes] = hhmm.split(":").map(Number);
+                        if (ampm === "PM" && hours !== 12) hours += 12;
+                        if (ampm === "AM" && hours === 12) hours = 0;
+                        const now = new Date();
+                        const selectedTimeVal = hours * 60 + minutes;
+                        const currentTimeVal = now.getHours() * 60 + now.getMinutes();
+                        if (selectedTimeVal < currentTimeVal) {
+                          setPreferredTimeSlot("");
+                          triggerPopup("warning", "Time Cleared", "The previously selected time is in the past for today. Please select a future time.");
+                        }
+                      }
                       setPreferredDate(tempDate);
                       if (errors.preferredDate) setErrors((prev) => ({ ...prev, preferredDate: "" }));
                     }
@@ -1167,6 +1199,24 @@ export const RaiseTicketScreen = () => {
                   style={[styles.modalActionBtn, styles.modalActionBtnOk, { backgroundColor: theme.colors.primary }]}
                   onPress={() => {
                     const formatted = `${tempHour.toString().padStart(2, "0")}:${tempMin.toString().padStart(2, "0")} ${tempPeriod}`;
+                    
+                    const checkDate = preferredDate || new Date();
+                    const isToday = checkDate.toDateString() === new Date().toDateString();
+                    if (isToday) {
+                      const now = new Date();
+                      let selectedHours = tempHour;
+                      if (tempPeriod === "PM" && selectedHours !== 12) selectedHours += 12;
+                      if (tempPeriod === "AM" && selectedHours === 12) selectedHours = 0;
+                      
+                      const selectedTimeVal = selectedHours * 60 + tempMin;
+                      const currentTimeVal = now.getHours() * 60 + now.getMinutes();
+                      
+                      if (selectedTimeVal < currentTimeVal) {
+                        triggerPopup("danger", "Invalid Time", "You cannot select a preferred visit time in the past.");
+                        return;
+                      }
+                    }
+
                     setPreferredTimeSlot(formatted);
                     if (errors.preferredDate) setErrors((prev) => ({ ...prev, preferredDate: "" }));
                     setTimeModalVisible(false);

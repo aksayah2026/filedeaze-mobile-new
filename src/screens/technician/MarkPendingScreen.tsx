@@ -74,12 +74,12 @@ export const MarkPendingScreen = () => {
       return;
     }
 
-    const fullReason = notes.trim()
-      ? `${selectedReason} — ${notes.trim()}`
-      : selectedReason;
-
     try {
-      await pendingMutation.mutateAsync({ ticketNo: jobId, pendingReason: fullReason });
+      await pendingMutation.mutateAsync({
+        ticketNo: jobId,
+        pendingReason: selectedReason,
+        notes: notes.trim(),
+      });
       Alert.alert(
         "Marked as Pending",
         `Ticket ${ticketNo} has been marked as Pending.\nReason: ${selectedReason}`,

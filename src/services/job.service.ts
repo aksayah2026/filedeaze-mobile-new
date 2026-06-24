@@ -410,9 +410,21 @@ export class JobService {
     notes?: string,
     photos?: string[]
   ): Promise<Ticket> {
+    let reasonEnum = "ADDITIONAL_VISIT_REQUIRED";
+    const lowerReason = pendingReason.toLowerCase();
+    if (lowerReason.includes("customer")) {
+      reasonEnum = "CUSTOMER_NOT_AVAILABLE";
+    } else if (lowerReason.includes("spare") || lowerReason.includes("parts")) {
+      reasonEnum = "SPARE_PARTS_NEEDED";
+    } else if (lowerReason.includes("additional") || lowerReason.includes("visit")) {
+      reasonEnum = "ADDITIONAL_VISIT_REQUIRED";
+    }
+
+    const finalNotes = notes && notes.trim() !== "" ? notes.trim() : `Marked as pending: ${pendingReason}`;
+
     const res = await apiClient.post<Ticket>(`${BASE}/tickets/${ticketNo}/pending`, {
-      pendingReason,
-      notes,
+      reason: reasonEnum,
+      notes: finalNotes,
       photos,
     });
     return res.data;

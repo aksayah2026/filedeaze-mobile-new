@@ -895,20 +895,6 @@ export const TechnicianJobDetailsScreen = () => {
                 Reason: <Text style={{ fontWeight: "700" }}>{job.pendingReason}</Text>
               </Text>
             </View>
-            <View style={[styles.btnRow, { marginTop: 16 }]}>
-              <AppButton
-                title="Resume Work"
-                onPress={() => handleStatusChange("IN_PROGRESS")}
-                style={{ flex: 1.5 }}
-                loading={updateStatusMutation.isPending}
-              />
-              <AppButton
-                title="Reschedule"
-                variant="outline"
-                onPress={() => setRescheduleVisible(true)}
-                style={{ flex: 1 }}
-              />
-            </View>
           </AppCard>
         )}
 
