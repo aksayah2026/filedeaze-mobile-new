@@ -33,6 +33,13 @@ import {
   Hash,
   Menu,
   Edit2,
+  Zap,
+  Wrench,
+  Flame,
+  Hammer,
+  Droplet,
+  Settings,
+  Home,
 } from "lucide-react-native";
 
 import { useTheme } from "../../theme";
@@ -43,6 +50,7 @@ import {
   useCustomerProfile,
   useUpdateCustomerProfile,
   useCustomerPayments,
+  useCategories,
 } from "../../hooks/useCustomer";
 import { CustomerStackParamList } from "../../types/navigation.types";
 import { AppHeader } from "../../components/AppHeader";
@@ -53,25 +61,48 @@ import { AppBadge } from "../../components/AppBadge";
 import { AppButton } from "../../components/AppButton";
 import { AppInput } from "../../components/AppInput";
 import { CustomerPopup } from "../../components/CustomerPopup";
+import { LinearGradient } from "expo-linear-gradient";
 
-type NavigationProp = NativeStackNavigationProp<CustomerStackParamList, "CustomerHome">;
-type CustomerTab = "TICKETS" | "INVOICES" | "PROFILE" | "PAYMENTS";
+type NavigationProp = NativeStackNavigationProp<
+  CustomerStackParamList,
+  "CustomerHome"
+>;
+type CustomerTab = "HOME" | "TICKETS" | "INVOICES" | "PROFILE" | "PAYMENTS";
 
 export const CustomerHomeScreen = () => {
   const theme = useTheme();
   const navigation = useNavigation<NavigationProp>();
   const { user, logout } = useAuthStore();
 
-  const [activeTab, setActiveTab] = useState<CustomerTab>("TICKETS");
+  const [activeTab, setActiveTab] = useState<CustomerTab>("HOME");
   const [logoutPopupVisible, setLogoutPopupVisible] = useState(false);
-  const [drawerVisible, setDrawerVisible] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
 
   // Queries
-  const { data: tickets = [], isLoading: isTicketsLoading, refetch: refetchTickets, isFetching: isFetchingTickets } = useCustomerTickets();
-  const { data: invoices = [], isLoading: isInvoicesLoading, refetch: refetchInvoices, isFetching: isFetchingInvoices } = useCustomerInvoices();
-  const { data: payments = [], isLoading: isPaymentsLoading, refetch: refetchPayments, isFetching: isFetchingPayments } = useCustomerPayments();
-  const { data: profile, isLoading: isProfileLoading, refetch: refetchProfile } = useCustomerProfile();
+  const { data: categories = [], isLoading: isCategoriesLoading } = useCategories();
+  const {
+    data: tickets = [],
+    isLoading: isTicketsLoading,
+    refetch: refetchTickets,
+    isFetching: isFetchingTickets,
+  } = useCustomerTickets();
+  const {
+    data: invoices = [],
+    isLoading: isInvoicesLoading,
+    refetch: refetchInvoices,
+    isFetching: isFetchingInvoices,
+  } = useCustomerInvoices();
+  const {
+    data: payments = [],
+    isLoading: isPaymentsLoading,
+    refetch: refetchPayments,
+    isFetching: isFetchingPayments,
+  } = useCustomerPayments();
+  const {
+    data: profile,
+    isLoading: isProfileLoading,
+    refetch: refetchProfile,
+  } = useCustomerProfile();
   const updateProfileMutation = useUpdateCustomerProfile();
 
   // Form states
@@ -96,29 +127,7 @@ export const CustomerHomeScreen = () => {
     }
   }, [profile]);
 
-  const screenWidth = Dimensions.get("window").width;
-  const drawerWidth = screenWidth * 0.85;
-
-  const [slideAnim] = useState(new Animated.Value(-drawerWidth));
-
-  const openDrawer = () => {
-    setDrawerVisible(true);
-    Animated.timing(slideAnim, {
-      toValue: 0,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const closeDrawer = () => {
-    Animated.timing(slideAnim, {
-      toValue: -drawerWidth,
-      duration: 250,
-      useNativeDriver: true,
-    }).start(() => {
-      setDrawerVisible(false);
-    });
-  };
+  // Removed drawer logic
 
   const handleSaveProfile = () => {
     updateProfileMutation.mutate(
@@ -138,8 +147,8 @@ export const CustomerHomeScreen = () => {
         },
         onError: (err: any) => {
           Alert.alert("Error", err.message || "Failed to update profile");
-        }
-      }
+        },
+      },
     );
   };
 
@@ -215,84 +224,128 @@ export const CustomerHomeScreen = () => {
   };
 
   const handleRefresh = () => {
-    if (activeTab === "TICKETS") refetchTickets();
+    if (activeTab === "HOME") {
+      // refetchCategories is not destructured, no need to refresh categories
+    } else if (activeTab === "TICKETS") refetchTickets();
     else if (activeTab === "INVOICES") refetchInvoices();
     else if (activeTab === "PAYMENTS") refetchPayments();
     else refetchProfile();
   };
 
   const isRefreshing = () => {
+    if (activeTab === "HOME") return isCategoriesLoading;
     if (activeTab === "TICKETS") return isFetchingTickets;
     if (activeTab === "INVOICES") return isFetchingInvoices;
     if (activeTab === "PAYMENTS") return isFetchingPayments;
     return isProfileLoading;
   };
 
+  const getCatColor = (name: string): { bg: string; icon: string } => {
+    const n = name.toLowerCase();
+    if (n.includes("electrical") || n.includes("power") || n.includes("wire"))
+      return { bg: "#FFF7ED", icon: "#F97316" };
+    if (n.includes("plumb") || n.includes("water") || n.includes("leak"))
+      return { bg: "#EFF6FF", icon: "#3B82F6" };
+    if (n.includes("ac") || n.includes("cool") || n.includes("heat") || n.includes("hvac"))
+      return { bg: "#F0F9FF", icon: "#0EA5E9" };
+    if (n.includes("carpenter") || n.includes("wood") || n.includes("furniture"))
+      return { bg: "#FFFBEB", icon: "#D97706" };
+    if (n.includes("paint"))
+      return { bg: "#FDF4FF", icon: "#A855F7" };
+    if (n.includes("clean"))
+      return { bg: "#ECFDF5", icon: "#10B981" };
+    if (n.includes("home") && !n.includes("appliance"))
+      return { bg: "#FFF1F2", icon: "#F43F5E" };
+    if (n.includes("appliance") || n.includes("repair") || n.includes("fix"))
+      return { bg: "#F0FDF4", icon: "#22C55E" };
+    const PALETTE = [
+      { bg: "#FFF7ED", icon: "#F97316" },
+      { bg: "#EFF6FF", icon: "#3B82F6" },
+      { bg: "#F0FDF4", icon: "#22C55E" },
+      { bg: "#FDF4FF", icon: "#A855F7" },
+      { bg: "#FFF1F2", icon: "#F43F5E" },
+      { bg: "#F0F9FF", icon: "#0EA5E9" },
+    ];
+    return PALETTE[name.charCodeAt(0) % PALETTE.length];
+  };
+
+  const getCategoryIconEl = (name: string, color: string, size: number) => {
+    const n = name.toLowerCase();
+    if (n.includes("electrical") || n.includes("power") || n.includes("wire")) {
+      return <Zap size={size} color={color} />;
+    }
+    if (n.includes("plumb") || n.includes("water") || n.includes("leak")) {
+      return <Droplet size={size} color={color} />;
+    }
+    if (n.includes("ac") || n.includes("cool") || n.includes("heat") || n.includes("hvac")) {
+      return <Flame size={size} color={color} />;
+    }
+    if (n.includes("carpenter") || n.includes("wood") || n.includes("furniture")) {
+      return <Hammer size={size} color={color} />;
+    }
+    if (n.includes("repair") || n.includes("fix") || n.includes("appliance")) {
+      return <Wrench size={size} color={color} />;
+    }
+    return <Settings size={size} color={color} />;
+  };
+
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <View
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+    >
       <AppHeader
         showTenantBranding
-        leftAction={
-          <Pressable
-            onPress={openDrawer}
-            style={({ pressed }) => [styles.logoutButton, pressed && { opacity: 0.7 }]}
-          >
-            <Menu color={theme.colors.text} size={24} />
-          </Pressable>
-        }
+        leftAction={null}
       />
 
-      {/* Customer Profile Banner */}
-      <View
+      {/* Premium Customer Profile Banner */}
+      <LinearGradient
+        colors={[theme.colors.primary, theme.colors.secondary]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
         style={[
           styles.profileBanner,
           {
-            backgroundColor: theme.colors.card,
-            borderBottomWidth: 1,
-            borderBottomColor: theme.colors.borderLight,
+            paddingBottom: 22,
+            paddingTop: 14,
+            borderBottomLeftRadius: 24,
+            borderBottomRightRadius: 24,
           },
         ]}
       >
-        <View
-          style={[
-            styles.avatarCircle,
-            { backgroundColor: `${theme.colors.primary}15` }
-          ]}
-        >
-          <User color={theme.colors.primary} size={24} />
-        </View>
-        <View style={styles.profileText}>
-          <View>
-            <Text style={[styles.welcomeText, { color: theme.colors.textMuted, fontSize: theme.typography.fontSize.xs }]}>
-              Customer Account
-            </Text>
-            <Text
-              style={[
-                styles.nameText,
-                {
-                  color: theme.colors.text,
-                  fontSize: theme.typography.fontSize.md,
-                  fontWeight: theme.typography.fontWeight.semibold,
-                },
-              ]}
-            >
-              {profile?.name || user?.name || "Customer"}
-            </Text>
+        <View style={[styles.avatarRing, { borderColor: "rgba(255,255,255,0.35)" }]}>
+          <View style={[styles.avatarCircle, { backgroundColor: "rgba(255,255,255,0.22)" }]}>
+            <User color="#ffffff" size={26} />
           </View>
         </View>
-
-        <Pressable
-          onPress={() => navigation.navigate("RaiseTicket")}
-          style={({ pressed }) => [
-            styles.topRaiseTicketBtn,
-            { backgroundColor: `${theme.colors.primary}12` },
-            pressed && { opacity: 0.7 }
-          ]}
-        >
-          <Plus size={14} color={theme.colors.primary} style={{ marginRight: 4 }} />
-          <Text style={[styles.topRaiseTicketText, { color: theme.colors.primary }]}>Raise Ticket</Text>
-        </Pressable>
-      </View>
+        <View style={styles.profileText}>
+          <Text
+            style={[
+              styles.welcomeText,
+              {
+                color: "rgba(255,255,255,0.72)",
+                fontSize: theme.typography.fontSize.xs,
+                textTransform: "uppercase",
+                letterSpacing: 1,
+              },
+            ]}
+          >
+            Customer Account
+          </Text>
+          <Text
+            style={[
+              styles.nameText,
+              {
+                color: "#ffffff",
+                fontSize: theme.typography.fontSize.lg,
+                fontWeight: theme.typography.fontWeight.bold,
+              },
+            ]}
+          >
+            {profile?.name || user?.name || "Customer"}
+          </Text>
+        </View>
+      </LinearGradient>
 
       {/* Reusable Customer Logout Popup */}
       <CustomerPopup
@@ -309,142 +362,7 @@ export const CustomerHomeScreen = () => {
         onCancel={() => setLogoutPopupVisible(false)}
       />
 
-      {/* Left Sidebar Profile Drawer */}
-      <Modal
-        transparent
-        visible={drawerVisible}
-        onRequestClose={closeDrawer}
-        animationType="none"
-      >
-        <View style={styles.drawerOverlay}>
-          <Pressable style={styles.backdropPressable} onPress={closeDrawer} />
-          
-          <Animated.View
-            style={[
-              styles.drawerContent,
-              {
-                width: drawerWidth,
-                transform: [{ translateX: slideAnim }],
-                backgroundColor: theme.colors.card,
-              },
-            ]}
-          >
-            <KeyboardAvoidingView
-              behavior={Platform.OS === "ios" ? "padding" : "height"}
-              style={{ flex: 1 }}
-            >
-              <View style={[styles.drawerHeader, { borderBottomColor: theme.colors.borderLight }]}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                  <View style={[styles.drawerAvatarCircle, { backgroundColor: `${theme.colors.primary}15` }]}>
-                    <User color={theme.colors.primary} size={20} />
-                  </View>
-                  <Text style={[styles.drawerTitle, { color: theme.colors.text }]}>Menu</Text>
-                </View>
-                <Pressable onPress={closeDrawer} style={styles.closeBtn}>
-                  <X size={20} color={theme.colors.textMuted} />
-                </Pressable>
-              </View>
-
-              <View style={styles.menuContainer}>
-                <ScrollView
-                  style={styles.drawerScroll}
-                  contentContainerStyle={styles.drawerScrollContent}
-                  showsVerticalScrollIndicator={false}
-                >
-                  <Pressable
-                    onPress={() => {
-                      setActiveTab("PROFILE");
-                      closeDrawer();
-                    }}
-                    style={({ pressed }) => [
-                      styles.menuItemRow,
-                      activeTab === "PROFILE" && { backgroundColor: `${theme.colors.primary}08` },
-                      pressed && { opacity: 0.7 }
-                    ]}
-                  >
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-                      <User size={20} color={activeTab === "PROFILE" ? theme.colors.primary : theme.colors.textMuted} />
-                      <Text style={[styles.menuItemLabel, { color: activeTab === "PROFILE" ? theme.colors.primary : theme.colors.text }]}>My Profile</Text>
-                    </View>
-                    <ChevronRight size={18} color={theme.colors.textMuted} />
-                  </Pressable>
-
-                  <Pressable
-                    onPress={() => {
-                      setActiveTab("TICKETS");
-                      closeDrawer();
-                    }}
-                    style={({ pressed }) => [
-                      styles.menuItemRow,
-                      activeTab === "TICKETS" && { backgroundColor: `${theme.colors.primary}08` },
-                      pressed && { opacity: 0.7 }
-                    ]}
-                  >
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-                      <ClipboardList size={20} color={activeTab === "TICKETS" ? theme.colors.primary : theme.colors.textMuted} />
-                      <Text style={[styles.menuItemLabel, { color: activeTab === "TICKETS" ? theme.colors.primary : theme.colors.text }]}>Service History</Text>
-                    </View>
-                    <ChevronRight size={18} color={theme.colors.textMuted} />
-                  </Pressable>
-
-                  <Pressable
-                    onPress={() => {
-                      setActiveTab("PAYMENTS");
-                      closeDrawer();
-                    }}
-                    style={({ pressed }) => [
-                      styles.menuItemRow,
-                      activeTab === "PAYMENTS" && { backgroundColor: `${theme.colors.primary}08` },
-                      pressed && { opacity: 0.7 }
-                    ]}
-                  >
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-                      <CreditCard size={20} color={activeTab === "PAYMENTS" ? theme.colors.primary : theme.colors.textMuted} />
-                      <Text style={[styles.menuItemLabel, { color: activeTab === "PAYMENTS" ? theme.colors.primary : theme.colors.text }]}>Payment History</Text>
-                    </View>
-                    <ChevronRight size={18} color={theme.colors.textMuted} />
-                  </Pressable>
-
-                  <Pressable
-                    onPress={() => {
-                      setActiveTab("INVOICES");
-                      closeDrawer();
-                    }}
-                    style={({ pressed }) => [
-                      styles.menuItemRow,
-                      activeTab === "INVOICES" && { backgroundColor: `${theme.colors.primary}08` },
-                      pressed && { opacity: 0.7 }
-                    ]}
-                  >
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-                      <FileText size={20} color={activeTab === "INVOICES" ? theme.colors.primary : theme.colors.textMuted} />
-                      <Text style={[styles.menuItemLabel, { color: activeTab === "INVOICES" ? theme.colors.primary : theme.colors.text }]}>Invoice List</Text>
-                    </View>
-                    <ChevronRight size={18} color={theme.colors.textMuted} />
-                  </Pressable>
-                </ScrollView>
-
-                <View style={[styles.drawerFooter, { borderTopColor: theme.colors.borderLight }]}>
-                  <Pressable
-                    onPress={() => {
-                      closeDrawer();
-                      setLogoutPopupVisible(true);
-                    }}
-                    style={({ pressed }) => [
-                      styles.drawerLogoutBtn,
-                      { borderColor: theme.colors.danger },
-                      pressed && { opacity: 0.7 }
-                    ]}
-                  >
-                    <LogOut size={18} color={theme.colors.danger} />
-                    <Text style={[styles.drawerLogoutText, { color: theme.colors.danger }]}>Logout</Text>
-                  </Pressable>
-                </View>
-              </View>
-            </KeyboardAvoidingView>
-          </Animated.View>
-        </View>
-      </Modal>
+      {/* Drawer Removed */}
 
       {/* Main Content View below header & Customer Account Banner */}
       <ScrollView
@@ -458,50 +376,144 @@ export const CustomerHomeScreen = () => {
           />
         }
       >
-        <View style={styles.tabHeader}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>{getActiveTabTitle()}</Text>
-        </View>
+        {activeTab === "HOME" && (
+          <View>
+            {/* Service Categories Grid */}
+            <View style={{ marginBottom: 24, paddingHorizontal: theme.spacing.md }}>
+              <Text style={[styles.sectionTitle, { color: theme.colors.textMuted, marginTop: 0 }]}>Select Service Category</Text>
+              {isCategoriesLoading ? (
+                <AppLoader message="Loading categories..." />
+              ) : (
+                <View style={styles.catGrid}>
+                  {categories.map((cat: any) => (
+                    <Pressable
+                      key={cat.id}
+                      style={({ pressed }) => [
+                        styles.catCard,
+                        { backgroundColor: theme.colors.card, borderColor: theme.colors.borderLight },
+                        pressed && { opacity: 0.88, transform: [{ scale: 0.95 }] }
+                      ]}
+                      onPress={() => {
+                        navigation.navigate("RaiseTicket", { categoryId: cat.id, categoryName: cat.name });
+                      }}
+                    >
+                      <View style={[styles.catIconCircle, { backgroundColor: getCatColor(cat.name).bg }]}>
+                        {getCategoryIconEl(cat.name, getCatColor(cat.name).icon, 28)}
+                      </View>
+                      <Text style={[styles.catName, { color: theme.colors.text }]} numberOfLines={2}>
+                        {cat.name}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+            </View>
+          </View>
+        )}
 
         {activeTab === "TICKETS" && (
           <View>
+
+            <View style={[styles.tabHeader, { paddingHorizontal: theme.spacing.md }]}>
+              <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>
+                Recent Service History
+              </Text>
+            </View>
+
             {isTicketsLoading ? (
               <AppLoader message="Retrieving requests..." />
             ) : tickets.length === 0 ? (
               <AppEmptyState
                 title="No Active Requests"
-                description="You haven't logged any service tickets yet. Tapping Raise Ticket at the top right to request appliance support."
+                description="You haven't logged any service tickets yet. Tap a category above to request appliance support."
               />
             ) : (
               tickets.map((item) => (
                 <AppCard
                   key={item.id}
-                  onPress={() => navigation.navigate("CustomerJobDetails", { jobId: item.id })}
-                  style={styles.ticketCard}
+                  onPress={() =>
+                    navigation.navigate("CustomerJobDetails", {
+                      jobId: item.id,
+                    })
+                  }
+                  style={[styles.ticketCard, { marginHorizontal: theme.spacing.md }]}
                 >
                   <View style={styles.cardHeader}>
-                    <Text style={[styles.ticketId, { color: theme.colors.textMuted }]}>{item.ticketNumber}</Text>
-                    <AppBadge label={getStatusLabel(item.status)} variant={getStatusVariant(item.status)} />
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      <ClipboardList size={16} color={theme.colors.textMuted} />
+                      <Text
+                        style={[
+                          styles.ticketId,
+                          { color: theme.colors.textMuted },
+                        ]}
+                      >
+                        {item.ticketNumber}
+                      </Text>
+                    </View>
+                    <AppBadge
+                      label={getStatusLabel(item.status)}
+                      variant={getStatusVariant(item.status)}
+                    />
                   </View>
 
-                  <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
+                  <Text
+                    style={[styles.cardTitle, { color: theme.colors.text, fontSize: 16, marginTop: 4 }]}
+                  >
                     {item.subCategory?.name || "—"}
                   </Text>
-                  <Text style={{ color: theme.colors.textMuted, fontSize: 13, marginBottom: 12 }} numberOfLines={2}>
+                  <Text
+                    style={{
+                      color: theme.colors.textMuted,
+                      fontSize: 14,
+                      marginBottom: 16,
+                      lineHeight: 20,
+                    }}
+                    numberOfLines={2}
+                  >
                     {item.description}
                   </Text>
 
-                  <View style={[styles.divider, { backgroundColor: theme.colors.borderLight }]} />
+                  <View
+                    style={[
+                      styles.divider,
+                      { backgroundColor: theme.colors.borderLight },
+                    ]}
+                  />
 
                   <View style={styles.cardFooter}>
                     <View style={styles.timeInfo}>
-                      <Calendar size={14} color={theme.colors.textMuted} style={{ marginRight: 4 }} />
-                      <Text style={{ fontSize: 12, color: theme.colors.textMuted }}>
-                        Date: {formatDate(item.createdAt)}
+                      <Calendar
+                        size={14}
+                        color={theme.colors.textMuted}
+                        style={{ marginRight: 6 }}
+                      />
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          color: theme.colors.textMuted,
+                          fontWeight: "500",
+                        }}
+                      >
+                        {formatDate(item.createdAt)}
                       </Text>
                     </View>
-                    <View style={styles.actionLink}>
-                      <Text style={{ fontSize: 12, color: theme.colors.primary, fontWeight: "700" }}>Details</Text>
-                      <ChevronRight size={14} color={theme.colors.primary} />
+                    <View
+                      style={[
+                        styles.actionLink,
+                        { backgroundColor: `${theme.colors.primary}15` },
+                      ]}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          color: theme.colors.primary,
+                          fontWeight: "700",
+                          marginRight: 4,
+                        }}
+                      >
+                        Details
+                      </Text>
+                      <ChevronRight size={16} color={theme.colors.primary} />
                     </View>
                   </View>
                 </AppCard>
@@ -523,31 +535,84 @@ export const CustomerHomeScreen = () => {
               invoices.map((inv) => (
                 <AppCard
                   key={inv.id}
-                  style={styles.ticketCard}
-                  onPress={() => navigation.navigate("InvoiceDetails", { invoiceId: inv.id })}
+                  style={[styles.ticketCard, { marginHorizontal: theme.spacing.md }]}
+                  onPress={() =>
+                    navigation.navigate("InvoiceDetails", { invoiceId: inv.id })
+                  }
                 >
                   <View style={styles.cardHeader}>
-                    <Text style={[styles.ticketId, { color: theme.colors.textMuted }]}>{inv.invoiceNumber}</Text>
-                    <AppBadge label={inv.payment?.status || "UNPAID"} variant="success" />
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      <FileText size={16} color={theme.colors.textMuted} />
+                      <Text
+                        style={[
+                          styles.ticketId,
+                          { color: theme.colors.textMuted },
+                        ]}
+                      >
+                        {inv.invoiceNumber}
+                      </Text>
+                    </View>
+                    <AppBadge
+                      label={inv.payment?.status || "UNPAID"}
+                      variant="success"
+                    />
                   </View>
-                  <Text style={[styles.invoiceTitle, { color: theme.colors.text }]}>
-                    Ticket Ref: <Text style={{ fontWeight: "700" }}>{inv.ticket?.ticketNumber || "—"}</Text>
+                  <Text
+                    style={[styles.invoiceTitle, { color: theme.colors.text }]}
+                  >
+                    Ticket Ref:{" "}
+                    <Text style={{ fontWeight: "700" }}>
+                      {inv.ticket?.ticketNumber || "—"}
+                    </Text>
                   </Text>
                   <View style={styles.invoiceBreakdown}>
                     <View style={styles.breakdownRow}>
-                      <Text style={{ color: theme.colors.textMuted, fontSize: 13 }}>Base Amount:</Text>
-                      <Text style={{ color: theme.colors.text, fontSize: 13 }}>₹{inv.subtotal}</Text>
-                    </View>
-                    <View style={styles.breakdownRow}>
-                      <Text style={{ color: theme.colors.textMuted, fontSize: 13 }}>
-                        {inv.gstPercent > 0 ? `GST (${inv.gstPercent}%):` : 'GST:'}
+                      <Text
+                        style={{ color: theme.colors.textMuted, fontSize: 13 }}
+                      >
+                        Base Amount:
                       </Text>
-                      <Text style={{ color: theme.colors.text, fontSize: 13 }}>₹{inv.gstAmount}</Text>
+                      <Text style={{ color: theme.colors.text, fontSize: 13 }}>
+                        ₹{inv.subtotal}
+                      </Text>
                     </View>
-                    <View style={[styles.divider, { backgroundColor: theme.colors.borderLight }]} />
                     <View style={styles.breakdownRow}>
-                      <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: "700" }}>Total:</Text>
-                      <Text style={{ color: theme.colors.primary, fontSize: 14, fontWeight: "700" }}>₹{inv.total}</Text>
+                      <Text
+                        style={{ color: theme.colors.textMuted, fontSize: 13 }}
+                      >
+                        {inv.gstPercent > 0
+                          ? `GST (${inv.gstPercent}%):`
+                          : "GST:"}
+                      </Text>
+                      <Text style={{ color: theme.colors.text, fontSize: 13 }}>
+                        ₹{inv.gstAmount}
+                      </Text>
+                    </View>
+                    <View
+                      style={[
+                        styles.divider,
+                        { backgroundColor: theme.colors.borderLight },
+                      ]}
+                    />
+                    <View style={styles.breakdownRow}>
+                      <Text
+                        style={{
+                          color: theme.colors.text,
+                          fontSize: 14,
+                          fontWeight: "700",
+                        }}
+                      >
+                        Total:
+                      </Text>
+                      <Text
+                        style={{
+                          color: theme.colors.primary,
+                          fontSize: 14,
+                          fontWeight: "700",
+                        }}
+                      >
+                        ₹{inv.total}
+                      </Text>
                     </View>
                   </View>
                 </AppCard>
@@ -572,47 +637,109 @@ export const CustomerHomeScreen = () => {
                   style={styles.ticketCard}
                   onPress={() => {
                     if (item.invoice?.invoiceNumber) {
-                      const matchingInvoice = invoices.find(inv => inv.invoiceNumber === item.invoice?.invoiceNumber);
-                      navigation.navigate("InvoiceDetails", { invoiceId: matchingInvoice?.id || item.id });
+                      const matchingInvoice = invoices.find(
+                        (inv) =>
+                          inv.invoiceNumber === item.invoice?.invoiceNumber,
+                      );
+                      navigation.navigate("InvoiceDetails", {
+                        invoiceId: matchingInvoice?.id || item.id,
+                      });
                     }
                   }}
                 >
                   <View style={styles.cardHeader}>
-                    <View style={{ flexDirection: "row", alignItems: "center" }}>
-                      <Text style={[styles.label, { color: theme.colors.textMuted }]}>Payment ID</Text>
-                      <Text style={[styles.valueId, { color: theme.colors.text }]}>: {item.id.substring(0, 8).toUpperCase()}</Text>
+                    <View
+                      style={{ flexDirection: "row", alignItems: "center", flex: 1 }}
+                    >
+                      <Text
+                        style={[
+                          styles.label,
+                          { color: theme.colors.textMuted },
+                        ]}
+                      >
+                        Payment ID
+                      </Text>
+                      <Text
+                        style={[styles.valueId, { color: theme.colors.text }]}
+                      >
+                        {item.id.substring(0, 8).toUpperCase()}
+                      </Text>
                     </View>
-                    <AppBadge label={item.status} variant={getPaymentStatusVariant(item.status)} />
+                    <AppBadge
+                      label={item.status}
+                      variant={getPaymentStatusVariant(item.status)}
+                    />
                   </View>
 
                   <View style={styles.detailRow}>
-                    <View style={{ flexDirection: "row", alignItems: "center" }}>
-                      <Text style={[styles.label, { color: theme.colors.textMuted }]}>Ticket Number</Text>
-                      <Text style={[styles.value, { color: theme.colors.text }]}>: {item.invoice?.invoiceNumber || "—"}</Text>
-                    </View>
+                    <Text
+                      style={[styles.label, { color: theme.colors.textMuted }]}
+                    >
+                      Invoice No.
+                    </Text>
+                    <Text style={[styles.value, { color: theme.colors.text }]}>
+                      {item.invoice?.invoiceNumber || "—"}
+                    </Text>
                   </View>
 
                   <View style={styles.detailRow}>
-                    <View style={{ flexDirection: "row", alignItems: "center" }}>
-                      <Text style={[styles.label, { color: theme.colors.textMuted }]}>Amount</Text>
-                      <Text style={[styles.valueAmount, { color: theme.colors.primary }]}>: ₹{item.amount}</Text>
-                    </View>
+                    <Text
+                      style={[styles.label, { color: theme.colors.textMuted }]}
+                    >
+                      Amount
+                    </Text>
+                    <Text
+                      style={[
+                        styles.valueAmount,
+                        { color: theme.colors.primary },
+                      ]}
+                    >
+                      ₹{item.amount}
+                    </Text>
                   </View>
 
-                  <View style={[styles.divider, { backgroundColor: theme.colors.borderLight }]} />
+                  <View
+                    style={[
+                      styles.divider,
+                      { backgroundColor: theme.colors.borderLight },
+                    ]}
+                  />
 
                   <View style={styles.cardFooter}>
                     <View style={styles.timeInfo}>
-                      <Calendar size={14} color={theme.colors.textMuted} style={{ marginRight: 4 }} />
-                      <Text style={{ fontSize: 10, color: theme.colors.textMuted }}>Date</Text>
-                      <Text style={{ fontSize: 12, color: theme.colors.text, fontWeight: "600" }}>
-                        : {formatDate(item.createdAt)}
+                      <Calendar
+                        size={14}
+                        color={theme.colors.textMuted}
+                        style={{ marginRight: 6 }}
+                      />
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          color: theme.colors.text,
+                          fontWeight: "600",
+                        }}
+                      >
+                        {formatDate(item.createdAt)}
                       </Text>
                     </View>
                     {item.invoice?.invoiceNumber ? (
-                      <View style={styles.actionLink}>
-                        <Text style={{ fontSize: 12, color: theme.colors.primary, fontWeight: "700" }}>Invoice</Text>
-                        <ChevronRight size={14} color={theme.colors.primary} />
+                      <View
+                        style={[
+                          styles.actionLink,
+                          { backgroundColor: `${theme.colors.primary}15` },
+                        ]}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            color: theme.colors.primary,
+                            fontWeight: "700",
+                            marginRight: 4,
+                          }}
+                        >
+                          Invoice
+                        </Text>
+                        <ChevronRight size={16} color={theme.colors.primary} />
                       </View>
                     ) : null}
                   </View>
@@ -628,23 +755,58 @@ export const CustomerHomeScreen = () => {
             style={{ flex: 1 }}
           >
             <AppCard style={styles.formCard}>
-              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                <Text style={[styles.drawerSectionTitle, { color: theme.colors.textMuted, marginVertical: 0 }]}>Profile Details</Text>
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 16,
+                }}
+              >
+                <Text
+                  style={[
+                    styles.drawerSectionTitle,
+                    { color: theme.colors.textMuted, marginVertical: 0 },
+                  ]}
+                >
+                  Profile Details
+                </Text>
                 <Pressable
                   onPress={() => setIsEditingProfile(!isEditingProfile)}
                   style={({ pressed }) => [
                     styles.editToggleBtn,
-                    { backgroundColor: isEditingProfile ? `${theme.colors.danger}15` : `${theme.colors.primary}15` },
-                    pressed && { opacity: 0.7 }
+                    {
+                      backgroundColor: isEditingProfile
+                        ? `${theme.colors.danger}15`
+                        : `${theme.colors.primary}15`,
+                    },
+                    pressed && { opacity: 0.7 },
                   ]}
                 >
-                  <Edit2 size={14} color={isEditingProfile ? theme.colors.danger : theme.colors.primary} style={{ marginRight: 4 }} />
-                  <Text style={[styles.editToggleText, { color: isEditingProfile ? theme.colors.danger : theme.colors.primary }]}>
+                  <Edit2
+                    size={14}
+                    color={
+                      isEditingProfile
+                        ? theme.colors.danger
+                        : theme.colors.primary
+                    }
+                    style={{ marginRight: 4 }}
+                  />
+                  <Text
+                    style={[
+                      styles.editToggleText,
+                      {
+                        color: isEditingProfile
+                          ? theme.colors.danger
+                          : theme.colors.primary,
+                      },
+                    ]}
+                  >
                     {isEditingProfile ? "Cancel" : "Edit"}
                   </Text>
                 </Pressable>
               </View>
-              
+
               <AppInput
                 label="Name"
                 value={name}
@@ -674,7 +836,9 @@ export const CustomerHomeScreen = () => {
                 placeholder="Enter mobile phone number"
                 keyboardType="phone-pad"
                 editable={false}
-                leftIcon={<Smartphone size={16} color={theme.colors.textMuted} />}
+                leftIcon={
+                  <Smartphone size={16} color={theme.colors.textMuted} />
+                }
                 style={{ opacity: 0.6 }}
               />
 
@@ -689,10 +853,25 @@ export const CustomerHomeScreen = () => {
                 style={!isEditingProfile && { opacity: 0.7 }}
               />
 
-              <View style={[styles.divider, { backgroundColor: theme.colors.borderLight, marginVertical: 16 }]} />
+              <View
+                style={[
+                  styles.divider,
+                  {
+                    backgroundColor: theme.colors.borderLight,
+                    marginVertical: 16,
+                  },
+                ]}
+              />
 
-              <Text style={[styles.drawerSectionTitle, { color: theme.colors.textMuted, marginBottom: 16 }]}>Address Details</Text>
-              
+              <Text
+                style={[
+                  styles.drawerSectionTitle,
+                  { color: theme.colors.textMuted, marginBottom: 16 },
+                ]}
+              >
+                Address Details
+              </Text>
+
               <AppInput
                 label="Address"
                 value={address}
@@ -732,10 +911,63 @@ export const CustomerHomeScreen = () => {
                   style={{ marginTop: 24 }}
                 />
               )}
+
+              <Pressable
+                onPress={() => setLogoutPopupVisible(true)}
+                style={({ pressed }) => [
+                  styles.profileLogoutBtn,
+                  { backgroundColor: `${theme.colors.danger}15`, marginTop: 32 },
+                  pressed && { opacity: 0.7, transform: [{ scale: 0.98 }] },
+                ]}
+              >
+                <LogOut size={20} color={theme.colors.danger} />
+                <Text
+                  style={[
+                    styles.profileLogoutText,
+                    { color: theme.colors.danger },
+                  ]}
+                >
+                  Logout
+                </Text>
+              </Pressable>
             </AppCard>
           </KeyboardAvoidingView>
         )}
       </ScrollView>
+
+      {/* Sticky Bottom Navigation Bar */}
+      <View style={[styles.bottomNav, { backgroundColor: theme.colors.card, borderTopColor: theme.colors.borderLight }]}>
+        <Pressable style={styles.navItem} onPress={() => setActiveTab("HOME")}>
+          <View style={[styles.navIconWrap, activeTab === "HOME" && { backgroundColor: `${theme.colors.primary}18` }]}>
+            <Home size={22} color={activeTab === "HOME" ? theme.colors.primary : theme.colors.textMuted} />
+          </View>
+          <Text style={[styles.navLabel, { color: activeTab === "HOME" ? theme.colors.primary : theme.colors.textMuted, fontWeight: activeTab === "HOME" ? "700" : "500" }]}>Home</Text>
+        </Pressable>
+        <Pressable style={styles.navItem} onPress={() => setActiveTab("TICKETS")}>
+          <View style={[styles.navIconWrap, activeTab === "TICKETS" && { backgroundColor: `${theme.colors.primary}18` }]}>
+            <ClipboardList size={22} color={activeTab === "TICKETS" ? theme.colors.primary : theme.colors.textMuted} />
+          </View>
+          <Text style={[styles.navLabel, { color: activeTab === "TICKETS" ? theme.colors.primary : theme.colors.textMuted, fontWeight: activeTab === "TICKETS" ? "700" : "500" }]}>Tickets</Text>
+        </Pressable>
+        <Pressable style={styles.navItem} onPress={() => setActiveTab("PAYMENTS")}>
+          <View style={[styles.navIconWrap, activeTab === "PAYMENTS" && { backgroundColor: `${theme.colors.primary}18` }]}>
+            <CreditCard size={22} color={activeTab === "PAYMENTS" ? theme.colors.primary : theme.colors.textMuted} />
+          </View>
+          <Text style={[styles.navLabel, { color: activeTab === "PAYMENTS" ? theme.colors.primary : theme.colors.textMuted, fontWeight: activeTab === "PAYMENTS" ? "700" : "500" }]}>Payments</Text>
+        </Pressable>
+        <Pressable style={styles.navItem} onPress={() => setActiveTab("INVOICES")}>
+          <View style={[styles.navIconWrap, activeTab === "INVOICES" && { backgroundColor: `${theme.colors.primary}18` }]}>
+            <FileText size={22} color={activeTab === "INVOICES" ? theme.colors.primary : theme.colors.textMuted} />
+          </View>
+          <Text style={[styles.navLabel, { color: activeTab === "INVOICES" ? theme.colors.primary : theme.colors.textMuted, fontWeight: activeTab === "INVOICES" ? "700" : "500" }]}>Invoices</Text>
+        </Pressable>
+        <Pressable style={styles.navItem} onPress={() => setActiveTab("PROFILE")}>
+          <View style={[styles.navIconWrap, activeTab === "PROFILE" && { backgroundColor: `${theme.colors.primary}18` }]}>
+            <User size={22} color={activeTab === "PROFILE" ? theme.colors.primary : theme.colors.textMuted} />
+          </View>
+          <Text style={[styles.navLabel, { color: activeTab === "PROFILE" ? theme.colors.primary : theme.colors.textMuted, fontWeight: activeTab === "PROFILE" ? "700" : "500" }]}>Profile</Text>
+        </Pressable>
+      </View>
     </View>
   );
 };
@@ -746,68 +978,113 @@ const styles = StyleSheet.create({
   },
   logoutButton: {
     padding: 8,
+    borderRadius: 8,
   },
   profileBanner: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 16,
+    paddingHorizontal: 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: "rgba(79,111,232,0.3)",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 1,
+    shadowRadius: 14,
+    elevation: 6,
+    marginBottom: 8,
+  },
+  avatarRing: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 14,
   },
   avatarCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 12,
+  },
+  bannerRaiseBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  bannerRaiseBtnText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#ffffff",
+    letterSpacing: 0.3,
   },
   profileText: {
     flex: 1,
   },
   welcomeText: {
     textTransform: "uppercase",
-    letterSpacing: 0.5,
+    letterSpacing: 1,
+    marginBottom: 4,
+    fontWeight: "600",
   },
   nameText: {
-    marginTop: 1,
+    letterSpacing: 0.5,
   },
   scrollContent: {
-    padding: 16,
+    paddingTop: 16,
     paddingBottom: 40,
   },
   tabHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 11,
-    fontWeight: "700",
+    fontSize: 13,
+    fontWeight: "800",
     textTransform: "uppercase",
-    letterSpacing: 0.8,
+    letterSpacing: 1.2,
     marginVertical: 12,
   },
   ticketCard: {
-    marginBottom: 16,
+    marginBottom: 14,
+    marginHorizontal: 16,
+    borderRadius: 16,
+    padding: 18,
+    shadowColor: "rgba(15,23,42,0.08)",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 1,
+    shadowRadius: 10,
+    elevation: 3,
   },
   cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: 12,
   },
   ticketId: {
-    fontSize: 12,
-    fontWeight: "700",
+    fontSize: 13,
+    fontWeight: "800",
+    letterSpacing: 0.5,
   },
   cardTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: "700",
-    marginBottom: 6,
+    marginBottom: 8,
+    lineHeight: 22,
   },
   divider: {
     height: 1,
-    marginVertical: 12,
+    marginVertical: 14,
+    opacity: 0.6,
   },
   cardFooter: {
     flexDirection: "row",
@@ -817,33 +1094,51 @@ const styles = StyleSheet.create({
   timeInfo: {
     flexDirection: "row",
     alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.03)",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
   },
   actionLink: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  invoiceTitle: {
-    fontSize: 14,
-    marginBottom: 8,
-  },
-  invoiceBreakdown: {
-    gap: 6,
-  },
-  breakdownRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  topRaiseTicketBtn: {
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 8,
+  },
+  invoiceTitle: {
+    fontSize: 15,
+    marginBottom: 12,
+    fontWeight: "500",
+  },
+  invoiceBreakdown: {
+    gap: 8,
+    backgroundColor: "rgba(0,0,0,0.015)",
+    padding: 12,
+    borderRadius: 12,
+  },
+  breakdownRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  topRaiseTicketBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
     alignSelf: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   topRaiseTicketText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "700",
+    letterSpacing: 0.3,
   },
   drawerOverlay: {
     flex: 1,
@@ -855,7 +1150,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.4)",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
   },
   drawerContent: {
     height: "100%",
@@ -864,46 +1159,52 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 10,
     elevation: 16,
+    borderTopRightRadius: 24,
+    borderBottomRightRadius: 24,
+    overflow: "hidden",
   },
   drawerHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === "ios" ? 50 : 20,
-    paddingBottom: 16,
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === "ios" ? 60 : 30,
+    paddingBottom: 20,
     borderBottomWidth: 1,
   },
   drawerAvatarCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
   },
   drawerTitle: {
-    fontSize: 16,
-    fontWeight: "700",
+    fontSize: 18,
+    fontWeight: "800",
+    letterSpacing: 0.5,
   },
   closeBtn: {
-    padding: 6,
+    padding: 8,
+    backgroundColor: "rgba(0,0,0,0.04)",
+    borderRadius: 20,
   },
   drawerScroll: {
     flex: 1,
   },
   drawerScrollContent: {
-    padding: 16,
+    padding: 20,
     paddingBottom: 40,
   },
   drawerSection: {
     gap: 12,
   },
   drawerSectionTitle: {
-    fontSize: 11,
-    fontWeight: "700",
+    fontSize: 12,
+    fontWeight: "800",
     textTransform: "uppercase",
-    letterSpacing: 0.8,
-    marginBottom: 8,
+    letterSpacing: 1,
+    marginBottom: 12,
   },
   addressBookItem: {
     flexDirection: "row",
@@ -925,67 +1226,159 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 16,
-    paddingHorizontal: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f1f5f9",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 8,
   },
   menuItemLabel: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "600",
   },
   drawerFooter: {
-    padding: 16,
+    padding: 20,
     borderTopWidth: 1,
   },
   drawerLogoutBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-    borderWidth: 1.5,
-    borderRadius: 8,
-    paddingVertical: 12,
+    gap: 10,
+    borderRadius: 12,
+    paddingVertical: 14,
     width: "100%",
   },
   drawerLogoutText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "700",
+    letterSpacing: 0.5,
   },
   formCard: {
-    padding: 16,
+    padding: 20,
+    marginHorizontal: 16,
+    borderRadius: 16,
+    shadowColor: "rgba(15,23,42,0.07)",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 1,
+    shadowRadius: 10,
+    elevation: 3,
   },
   label: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "600",
+    width: 110,
   },
   valueId: {
-    fontSize: 13,
-    fontWeight: "700",
+    fontSize: 14,
+    fontWeight: "800",
+    flex: 1,
+    textAlign: "left",
   },
   detailRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: 10,
   },
   value: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "600",
+    flex: 1,
+    textAlign: "left",
   },
   valueAmount: {
-    fontSize: 15,
-    fontWeight: "700",
+    fontSize: 16,
+    fontWeight: "800",
+    flex: 1,
+    textAlign: "left",
   },
   editToggleBtn: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
   },
   editToggleText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "700",
+  },
+  catGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  catCard: {
+    width: "48%",
+    borderRadius: 16,
+    padding: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    shadowColor: "rgba(15,23,42,0.07)",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 1,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  catIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+  catName: {
+    fontSize: 13,
+    fontWeight: "700",
+    textAlign: "center",
+    letterSpacing: 0.1,
+    lineHeight: 18,
+  },
+  bottomNav: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
+    paddingVertical: 10,
+    paddingBottom: Platform.OS === "ios" ? 26 : 10,
+    backgroundColor: "#ffffff",
+    shadowColor: "rgba(15,23,42,0.10)",
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 1,
+    shadowRadius: 10,
+    elevation: 12,
+  },
+  navItem: {
+    alignItems: "center",
+    justifyContent: "center",
+    flex: 1,
+    gap: 3,
+  },
+  navIconWrap: {
+    width: 48,
+    height: 30,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  navLabel: {
+    fontSize: 10,
+    fontWeight: "500",
+    letterSpacing: 0.1,
+  },
+  profileLogoutBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 16,
+    borderRadius: 12,
+    gap: 10,
+  },
+  profileLogoutText: {
+    fontSize: 15,
+    fontWeight: "700",
+    letterSpacing: 0.5,
   },
 });
 

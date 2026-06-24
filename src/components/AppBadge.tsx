@@ -44,14 +44,17 @@ export const AppBadge: React.FC<AppBadgeProps> = ({
         break;
     }
 
-    return { bg, text };
+    return { bg, text, border: `${text}40` };
   };
 
-  const { bg, text } = getColors();
+  const { bg, text, border } = getColors();
 
   const paddingHorizontal = size === "sm" ? theme.spacing.sm : theme.spacing.md;
-  const paddingVertical = size === "sm" ? 3 : 6;
-  const fontSize = size === "sm" ? theme.typography.fontSize.xs - 1 : theme.typography.fontSize.xs;
+  const paddingVertical = size === "sm" ? 4 : 6;
+  const fontSize =
+    size === "sm"
+      ? theme.typography.fontSize.xs - 1
+      : theme.typography.fontSize.xs;
 
   return (
     <View
@@ -62,6 +65,8 @@ export const AppBadge: React.FC<AppBadgeProps> = ({
           paddingHorizontal,
           paddingVertical,
           borderRadius: theme.borderRadius.round,
+          borderWidth: 1,
+          borderColor: border,
         },
         style,
       ]}
@@ -70,9 +75,9 @@ export const AppBadge: React.FC<AppBadgeProps> = ({
         style={{
           color: text,
           fontSize,
-          fontWeight: theme.typography.fontWeight.semibold,
+          fontWeight: theme.typography.fontWeight.bold,
           textTransform: "uppercase",
-          letterSpacing: 0.5,
+          letterSpacing: 0.7,
         }}
       >
         {label}

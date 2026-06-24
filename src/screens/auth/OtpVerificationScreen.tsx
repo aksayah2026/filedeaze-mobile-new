@@ -133,16 +133,22 @@ export const OtpVerificationScreen = () => {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.headerRow}>
-          <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
-            <ArrowLeft color={theme.colors.text} size={24} />
+          <Pressable onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: theme.colors.background }]}>
+            <ArrowLeft color={theme.colors.text} size={20} />
           </Pressable>
-          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Enter Code</Text>
+          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Verify Your Account</Text>
         </View>
 
-        <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>
-          An OTP verification code was sent to the email address:{" "}
-          <Text style={{ fontWeight: "600", color: theme.colors.text }}>{email}</Text>.
-        </Text>
+        <View style={[styles.otpIconWrap, { backgroundColor: `${theme.colors.primary}10` }]}>
+          <KeyRound size={32} color={theme.colors.primary} />
+        </View>
+
+        <View style={[styles.emailHighlight, { backgroundColor: `${theme.colors.primary}08`, borderColor: `${theme.colors.primary}20` }]}>
+          <Text style={[styles.emailHighlightText, { color: theme.colors.textMuted }]}>
+            Verification code sent to
+          </Text>
+          <Text style={[styles.emailHighlightAddr, { color: theme.colors.text }]}>{email}</Text>
+        </View>
 
         <AppCard style={styles.formCard}>
           {error && (
@@ -198,15 +204,43 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: 20,
   },
   backButton: {
-    padding: 4,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
     marginRight: 12,
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: "800",
+  },
+  otpIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "center",
+    marginBottom: 20,
+  },
+  emailHighlight: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 14,
+    alignItems: "center",
+    marginBottom: 24,
+  },
+  emailHighlightText: {
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  emailHighlightAddr: {
+    fontSize: 14,
+    fontWeight: "700",
   },
   subtitle: {
     fontSize: 13,

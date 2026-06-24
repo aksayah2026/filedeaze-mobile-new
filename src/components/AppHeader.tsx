@@ -34,8 +34,12 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         {
           paddingTop: insets.top + (Platform.OS === "ios" ? 8 : 12),
           backgroundColor: theme.colors.card,
-          borderBottomWidth: 1,
-          borderBottomColor: theme.colors.borderLight,
+          shadowColor: "rgba(15,23,42,0.08)",
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 1,
+          shadowRadius: 6,
+          elevation: 4,
+          zIndex: 10,
         },
       ]}
     >

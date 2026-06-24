@@ -46,9 +46,9 @@ export const AppButton: React.FC<AppButtonProps> = ({
     };
 
     // Height sizing
-    let height = 48;
-    if (size === "sm") height = 36;
-    if (size === "lg") height = 56;
+    let height = 52;
+    if (size === "sm") height = 38;
+    if (size === "lg") height = 58;
 
     // Variants
     let backgroundColor = theme.colors.primary;

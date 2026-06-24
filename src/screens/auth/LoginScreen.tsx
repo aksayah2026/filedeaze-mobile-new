@@ -85,20 +85,26 @@ export const LoginScreen = () => {
       >
         <View style={styles.headerSection}>
           {(APP_CONFIG as any).logo ? (
-            <Image source={{ uri: (APP_CONFIG as any).logo }} style={styles.logo} />
+            <View style={[styles.logoRing, { borderColor: `${theme.colors.primary}30` }]}>
+              <Image source={{ uri: (APP_CONFIG as any).logo }} style={styles.logo} />
+            </View>
           ) : (
-            <View style={[styles.logoPlaceholder, { backgroundColor: theme.colors.primary }]}>
-              <Shield color="#ffffff" size={36} />
+            <View style={[styles.logoRing, { borderColor: `${theme.colors.primary}28` }]}>
+              <View style={[styles.logoPlaceholder, { backgroundColor: theme.colors.primary }]}>
+                <Shield color="#ffffff" size={36} />
+              </View>
             </View>
           )}
           <Text style={[styles.appName, { color: theme.colors.text, fontSize: theme.typography.fontSize.xxl }]}>
             {APP_CONFIG.appName}
           </Text>
-          <Text style={[styles.welcomeText, { color: theme.colors.text, fontSize: theme.typography.fontSize.lg }]}>
-            Welcome Back
-          </Text>
+          <View style={[styles.welcomePill, { backgroundColor: `${theme.colors.primary}10` }]}>
+            <Text style={[styles.welcomeText, { color: theme.colors.primary, fontSize: 13 }]}>
+              Welcome Back 👋
+            </Text>
+          </View>
           <Text style={[styles.tagline, { color: theme.colors.textMuted }]}>
-            Secure Portal login for customers & service technicians
+            Sign in to manage your services
           </Text>
         </View>
 
@@ -187,31 +193,44 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 28,
   },
-  logo: {
-    width: 80,
-    height: 80,
-    borderRadius: 20,
-    marginBottom: 14,
-  },
-  logoPlaceholder: {
-    width: 80,
-    height: 80,
-    borderRadius: 20,
+  logoRing: {
+    width: 104,
+    height: 104,
+    borderRadius: 52,
+    borderWidth: 2,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 14,
+    marginBottom: 16,
+  },
+  logo: {
+    width: 86,
+    height: 86,
+    borderRadius: 22,
+  },
+  logoPlaceholder: {
+    width: 86,
+    height: 86,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
   },
   appName: {
     fontWeight: "800",
     letterSpacing: -0.5,
+    marginBottom: 10,
+  },
+  welcomePill: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginBottom: 6,
   },
   welcomeText: {
     fontWeight: "700",
-    marginTop: 12,
   },
   tagline: {
     fontSize: 13,
-    marginTop: 6,
+    marginTop: 2,
     textAlign: "center",
   },
   formCard: {

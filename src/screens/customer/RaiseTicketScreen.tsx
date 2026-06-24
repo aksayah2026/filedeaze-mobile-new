@@ -12,7 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
   Camera,
@@ -63,6 +63,9 @@ type NavigationProp = NativeStackNavigationProp<CustomerStackParamList, "RaiseTi
 export const RaiseTicketScreen = () => {
   const theme = useTheme();
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute<RouteProp<CustomerStackParamList, "RaiseTicket">>();
+  const { categoryId, categoryName } = route.params || {};
+  const isCategoryLocked = !!categoryId;
 
   // API hooks
   const { data: categories = [], isLoading: isLoadingCats } = useCategories();
@@ -75,7 +78,7 @@ export const RaiseTicketScreen = () => {
   const deleteAddressMutation = useDeleteCustomerAddress();
 
   // Form states
-  const [selectedCat, setSelectedCat] = useState<any>(null);
+  const [selectedCat, setSelectedCat] = useState<any>(categoryId ? { id: categoryId, name: categoryName } : null);
   const [selectedSub, setSelectedSub] = useState<any>(null);
   const [description, setDescription] = useState("");
   const [preferredDate, setPreferredDate] = useState<Date | null>(null);
@@ -454,7 +457,12 @@ export const RaiseTicketScreen = () => {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Card 1: Service Category Details */}
         <AppCard style={styles.card}>
-          <Text style={[styles.cardTitle, { color: theme.colors.primary }]}>1. Service Information</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 18 }}>
+            <View style={[styles.stepBadge, { backgroundColor: theme.colors.primary }]}>
+              <Text style={styles.stepBadgeText}>1</Text>
+            </View>
+            <Text style={[styles.cardTitle, { color: theme.colors.text, marginBottom: 0 }]}>Service Information</Text>
+          </View>
 
           {/* Category */}
           <View style={styles.fieldWrapper}>
@@ -463,7 +471,14 @@ export const RaiseTicketScreen = () => {
               <Text style={{ color: theme.colors.danger, fontWeight: "bold" }}> *</Text>
             </View>
             <Pressable
-              style={[styles.dropdownBtn, { backgroundColor: theme.colors.background, borderColor: theme.colors.borderLight }]}
+              style={[
+                styles.dropdownBtn, 
+                { 
+                  backgroundColor: isCategoryLocked ? `${theme.colors.primary}08` : theme.colors.background, 
+                  borderColor: isCategoryLocked ? `${theme.colors.primary}30` : theme.colors.borderLight 
+                }
+              ]}
+              disabled={isCategoryLocked}
               onPress={() => setCatModalVisible(true)}
             >
               <View style={styles.dropdownValueWrapper}>
@@ -476,8 +491,15 @@ export const RaiseTicketScreen = () => {
                   {selectedCat ? selectedCat.name : "Select category..."}
                 </Text>
               </View>
-              <ChevronDown size={18} color={theme.colors.textMuted} />
+              {!isCategoryLocked && (
+                <ChevronDown size={18} color={theme.colors.textMuted} />
+              )}
             </Pressable>
+            {isCategoryLocked && (
+              <View style={{ flexDirection: "row", alignItems: "center", marginTop: 6, marginLeft: 2, gap: 4 }}>
+      
+              </View>
+            )}
             {submitAttempted && errors.category ? (
               <Text style={[styles.errorText, { color: theme.colors.danger }]}>{errors.category}</Text>
             ) : null}
@@ -537,7 +559,12 @@ export const RaiseTicketScreen = () => {
 
         {/* Card 2: Date & Time Trigger Buttons */}
         <AppCard style={styles.card}>
-          <Text style={[styles.cardTitle, { color: theme.colors.primary }]}>2. Preferred Visit Schedule</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 18 }}>
+            <View style={[styles.stepBadge, { backgroundColor: theme.colors.primary }]}>
+              <Text style={styles.stepBadgeText}>2</Text>
+            </View>
+            <Text style={[styles.cardTitle, { color: theme.colors.text, marginBottom: 0 }]}>Preferred Visit Schedule</Text>
+          </View>
 
           <View style={{ flexDirection: "row", gap: 12 }}>
             {/* Preferred Date Selector */}
@@ -606,7 +633,12 @@ export const RaiseTicketScreen = () => {
 
         {/* Card 3: Address Details */}
         <AppCard style={styles.card}>
-          <Text style={[styles.cardTitle, { color: theme.colors.primary }]}>3. Visit Address</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 18 }}>
+            <View style={[styles.stepBadge, { backgroundColor: theme.colors.primary }]}>
+              <Text style={styles.stepBadgeText}>3</Text>
+            </View>
+            <Text style={[styles.cardTitle, { color: theme.colors.text, marginBottom: 0 }]}>Visit Address</Text>
+          </View>
 
           <View style={styles.fieldWrapper}>
             <View style={styles.labelRow}>
@@ -642,7 +674,12 @@ export const RaiseTicketScreen = () => {
 
         {/* Card 4: Document Media Attachments */}
         <AppCard style={styles.card}>
-          <Text style={[styles.cardTitle, { color: theme.colors.primary }]}>4. Media Documentation</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 18 }}>
+            <View style={[styles.stepBadge, { backgroundColor: theme.colors.primary }]}>
+              <Text style={styles.stepBadgeText}>4</Text>
+            </View>
+            <Text style={[styles.cardTitle, { color: theme.colors.text, marginBottom: 0 }]}>Media Documentation</Text>
+          </View>
 
           <View style={styles.fieldWrapper}>
             <View style={styles.labelRow}>
@@ -717,13 +754,15 @@ export const RaiseTicketScreen = () => {
         </AppCard>
 
         {/* Action Button */}
-        <AppButton
-          title="Submit Ticket"
-          onPress={handleSubmit}
-          disabled={isFormIncomplete || raiseTicketMutation.isPending}
-          loading={raiseTicketMutation.isPending}
-          style={styles.submitBtn}
-        />
+        <View style={{ paddingHorizontal: 16, paddingVertical: 24 }}>
+          <AppButton
+            title="Submit Ticket"
+            onPress={handleSubmit}
+            disabled={isFormIncomplete || raiseTicketMutation.isPending}
+            loading={raiseTicketMutation.isPending}
+            style={{ elevation: 4, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8 }}
+          />
+        </View>
       </ScrollView>
 
       {/* Reusable Customer Popup Dialog */}
@@ -1376,16 +1415,27 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   card: {
-    marginBottom: 20,
-    padding: 16,
-    borderRadius: 16,
+    marginBottom: 16,
+    padding: 18,
+    borderRadius: 18,
+  },
+  stepBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepBadgeText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#ffffff",
   },
   cardTitle: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    marginBottom: 16,
+    letterSpacing: 0.1,
+    marginBottom: 0,
   },
   fieldWrapper: {
     marginBottom: 16,
@@ -1399,16 +1449,16 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "700",
     textTransform: "uppercase",
-    letterSpacing: 0.5,
+    letterSpacing: 0.8,
   },
   dropdownBtn: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 12,
-    borderWidth: 1.5,
-    borderRadius: 10,
-    minHeight: 52,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderRadius: 12,
+    minHeight: 54,
   },
   dropdownValueWrapper: {
     flexDirection: "row",

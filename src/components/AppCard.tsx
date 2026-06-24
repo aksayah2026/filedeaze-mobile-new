@@ -35,17 +35,17 @@ export const AppCard: React.FC<AppCardProps> = ({
 
   const cardStyle: ViewStyle = {
     backgroundColor: theme.colors.card,
-    borderRadius: theme.borderRadius.md,
+    borderRadius: theme.borderRadius.lg,
     padding: getPaddingValue(),
-    borderWidth: border ? 1.5 : 0,
-    borderColor: theme.colors.borderLight,
+    borderWidth: 1,
+    borderColor: border ? theme.colors.border : theme.colors.borderLight,
     // Shadow for iOS
-    shadowColor: theme.colors.shadow,
-    shadowOffset: { width: 0, height: 4 },
+    shadowColor: "rgba(15,23,42,0.10)",
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: elevation ? 1 : 0,
-    shadowRadius: 12,
+    shadowRadius: 8,
     // Elevation for Android
-    elevation: elevation ? 4 : 0,
+    elevation: elevation ? 3 : 0,
   };
 
   if (onPress) {

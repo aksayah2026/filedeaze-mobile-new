@@ -17,7 +17,7 @@ export type CustomerStackParamList = {
   CustomerHome: undefined;
   CustomerJobDetails: { jobId: string };
   CustomerDashboard: undefined;
-  RaiseTicket: undefined;
+  RaiseTicket: { categoryId?: string; categoryName?: string } | undefined;
   TicketHistory: undefined;
   CustomerTicketDetails: { ticketId: string };
   LiveTracking: { ticketId: string; ticketNumber?: string; hasFeedback?: boolean };

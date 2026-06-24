@@ -290,9 +290,9 @@ export const CustomerJobDetailsScreen = () => {
                       <View style={[
                         styles.timelineDotContainer,
                         {
-                          backgroundColor: `${theme.colors.primary}12`,
-                          borderColor: isLast && !isClosed ? theme.colors.primary : `${theme.colors.primary}40`,
-                          borderWidth: isLast && !isClosed ? 2 : 1.5,
+                          backgroundColor: theme.colors.card,
+                          borderColor: theme.colors.primary,
+                          borderWidth: 1.5,
                         }
                       ]}>
                         <StatusIcon size={12} color={theme.colors.primary} />
@@ -328,12 +328,12 @@ export const CustomerJobDetailsScreen = () => {
                     <View style={[
                       styles.timelineDotContainer,
                       {
-                        backgroundColor: `${theme.colors.primary}12`,
+                        backgroundColor: theme.colors.card,
                         borderColor: theme.colors.primary,
-                        borderWidth: 2,
+                        borderWidth: 1.5,
                       }
                     ]}>
-                      <Star size={12} color={theme.colors.primary} fill={ticket.feedback ? theme.colors.primary : "transparent"} />
+                      <Star size={12} color={theme.colors.primary} />
                     </View>
                   </View>
                   <View style={styles.timelineContent}>
@@ -364,7 +364,7 @@ export const CustomerJobDetailsScreen = () => {
                           style={({ pressed }) => [
                             styles.callButton,
                             {
-                              backgroundColor: `${theme.colors.primary}12`,
+                              backgroundColor: `${theme.colors.primary}0D`,
                               opacity: pressed ? 0.7 : 1,
                               alignSelf: "flex-start",
                               marginTop: 4,
@@ -584,7 +584,7 @@ const styles = StyleSheet.create({
   },
   timelineItem: {
     flexDirection: "row",
-    minHeight: 65,
+    minHeight: 75,
     paddingHorizontal: 4,
   },
   timelineIndicator: {
@@ -597,13 +597,13 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 4,
+    marginTop: 2,
     zIndex: 2,
   },
   timelineLine: {
-    width: 2,
+    width: 1.5,
     flex: 1,
-    marginTop: 4,
+    marginTop: 0,
     zIndex: 1,
   },
   timelineContent: {

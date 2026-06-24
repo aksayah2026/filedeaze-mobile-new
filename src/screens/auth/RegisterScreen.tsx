@@ -87,14 +87,14 @@ export const RegisterScreen = () => {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.headerRow}>
-          <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
-            <ArrowLeft color={theme.colors.text} size={24} />
+          <Pressable onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: theme.colors.background }]}>
+            <ArrowLeft color={theme.colors.text} size={20} />
           </Pressable>
           <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Create Account</Text>
         </View>
 
         <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>
-          Register to book maintenance services and track technical operations in real-time.
+          Register to book services and track your requests in real-time.
         </Text>
 
         <AppCard style={styles.formCard}>
@@ -241,7 +241,11 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   backButton: {
-    padding: 4,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
     marginRight: 12,
   },
   headerTitle: {

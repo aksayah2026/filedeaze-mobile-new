@@ -30,7 +30,7 @@ export const AppInput = React.forwardRef<TextInput, AppInputProps>(
       onBlur,
       ...rest
     },
-    ref
+    ref,
   ) => {
     const theme = useTheme();
     const [isFocused, setIsFocused] = useState(false);
@@ -55,8 +55,8 @@ export const AppInput = React.forwardRef<TextInput, AppInputProps>(
                 color: error
                   ? theme.colors.danger
                   : isFocused
-                  ? theme.colors.primary
-                  : theme.colors.textMuted,
+                    ? theme.colors.primary
+                    : theme.colors.textMuted,
                 fontSize: theme.typography.fontSize.xs,
                 fontWeight: theme.typography.fontWeight.medium,
                 marginBottom: theme.spacing.xs,
@@ -71,14 +71,16 @@ export const AppInput = React.forwardRef<TextInput, AppInputProps>(
           style={[
             styles.inputContainer,
             {
-              backgroundColor: theme.colors.card,
-              borderRadius: theme.borderRadius.md,
-              borderWidth: 1.5,
+              backgroundColor: isFocused
+                ? theme.colors.card
+                : theme.colors.background,
+              borderRadius: 12,
+              borderWidth: isFocused ? 1.5 : 1,
               borderColor: error
                 ? theme.colors.danger
                 : isFocused
-                ? theme.colors.primary
-                : theme.colors.borderLight,
+                  ? theme.colors.primary
+                  : theme.colors.borderLight,
               paddingHorizontal: theme.spacing.md,
             },
           ]}
@@ -92,7 +94,8 @@ export const AppInput = React.forwardRef<TextInput, AppInputProps>(
               {
                 color: theme.colors.text,
                 fontSize: theme.typography.fontSize.md,
-                height: 48,
+                height: rest.multiline ? undefined : 52,
+                minHeight: rest.multiline ? 100 : 52,
               },
               style,
             ]}
@@ -102,7 +105,9 @@ export const AppInput = React.forwardRef<TextInput, AppInputProps>(
             {...rest}
           />
 
-          {rightIcon && <View style={styles.rightIconContainer}>{rightIcon}</View>}
+          {rightIcon && (
+            <View style={styles.rightIconContainer}>{rightIcon}</View>
+          )}
         </View>
 
         {error && (
@@ -122,7 +127,7 @@ export const AppInput = React.forwardRef<TextInput, AppInputProps>(
         )}
       </View>
     );
-  }
+  },
 );
 
 const styles = StyleSheet.create({

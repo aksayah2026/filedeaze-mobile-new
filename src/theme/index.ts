@@ -61,21 +61,21 @@ export interface AppTheme {
 }
 
 export const DEFAULT_THEME_COLORS: ThemeColors = {
-  primary: (APP_CONFIG as any).primaryColor || "#2563EB",
-  secondary: "#0f172a", // Default secondary (slate-900)
-  success: "#10b981", // Emerald-500
-  warning: "#f59e0b", // Amber-500
-  danger: "#ef4444", // Rose-500
-  background: "#f8fafc", // Slate-50
-  card: "#ffffff", // Pure white
-  text: "#0f172a", // Slate-900
-  textMuted: "#64748b", // Slate-500
-  textLight: "#94a3b8", // Slate-400
-  border: "#cbd5e1", // Slate-300
-  borderLight: "#e2e8f0", // Slate-200
-  shadow: "rgba(15, 23, 42, 0.08)",
-  purple: "#8b5cf6", // Purple-500
-  amber: "#f59e0b", // Amber-500 (standard warning)
+  primary: (APP_CONFIG as any).primaryColor || "#4F6FE8",
+  secondary: "#6B8FF5",
+  success: "#0EA873",
+  warning: "#F59E0B",
+  danger: "#EF4444",
+  background: "#F4F5F9",
+  card: "#FFFFFF",
+  text: "#0F172A",
+  textMuted: "#64748B",
+  textLight: "#94A3B8",
+  border: "#CBD5E1",
+  borderLight: "#E2E8F0",
+  shadow: "rgba(15, 23, 42, 0.09)",
+  purple: "#7C3AED",
+  amber: "#F59E0B",
 };
 
 export const SPACING: Spacing = {
@@ -107,11 +107,11 @@ export const TYPOGRAPHY: Typography = {
 };
 
 export const BORDER_RADIUS = {
-  xs: 4,
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 24,
+  xs: 6,
+  sm: 10,
+  md: 14,
+  lg: 20,
+  xl: 28,
   round: 9999,
 };
 
