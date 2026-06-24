@@ -15,6 +15,7 @@ import {
   ThumbsDown,
   CreditCard,
   ArrowUpRight,
+  Receipt,
 } from "lucide-react-native";
 import { TicketStatus } from "../services/job.service";
 import { useTheme } from "../theme";
@@ -136,7 +137,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, paymentCollect
       bgColor = "#475569"; // Solid slate gray background
       break;
     case "INVOICE_GENERATED" as any:
-      Icon = CreditCard;
+      Icon = Receipt;
       color = "#16A34A";
       bgColor = "#F0FDF4"; // Light green Payment badge
       break;

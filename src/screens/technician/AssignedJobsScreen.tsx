@@ -26,13 +26,16 @@ import {
   Calendar,
   Briefcase,
   ChevronRight,
+  ChevronLeft,
+  ChevronDown,
   Compass,
   LucideIcon,
   User,
+  Receipt,
 } from "lucide-react-native";
 
 import { useTheme } from "../../theme";
-import { useTechnicianJobs } from "../../hooks/useJobs";
+import { useTechnicianJobs, useTechnicianInvoices } from "../../hooks/useJobs";
 import { TechnicianStackParamList } from "../../types/navigation.types";
 import { AppHeader } from "../../components/AppHeader";
 import { TicketStatus } from "../../services/job.service";
@@ -60,8 +63,17 @@ const ACTION_LABEL: Partial<Record<TicketStatus, string>> = {
   REACHED: "Start Job",
   IN_PROGRESS: "Complete / Pending",
   PENDING: "Resume Job",
-  INVOICE_GENERATED: "Collect Payment",
+  INVOICE_GENERATED: "View Invoice Details",
+  CLOSED: "View Invoice Details",
 } as any;
+
+const getTodayStr = () => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
 
 export const AssignedJobsScreen = () => {
   const theme = useTheme();
@@ -69,18 +81,83 @@ export const AssignedJobsScreen = () => {
   const route = useRoute<RouteProps>();
 
   const [activeTab, setActiveTab] = useState<TabFilter>(route.params?.initialTab || "ALL");
+  const [selectedDate, setSelectedDate] = useState<string | null>(getTodayStr());
   const [lockModalVisible, setLockModalVisible] = useState(false);
   const [lockModalMessage, setLockModalMessage] = useState("");
   const tabListRef = useRef<FlatList>(null);
+
+  const now = new Date();
+  const [currentMonth, setCurrentMonth] = useState(now.getMonth() + 1);
+  const [currentYear, setCurrentYear] = useState(now.getFullYear());
+  const [calendarVisible, setCalendarVisible] = useState(true);
+
+  const getSelectedDateText = () => {
+    if (!selectedDate) return "Filter by Date";
+    const parts = selectedDate.split("-");
+    const y = parts[0];
+    const mIdx = parseInt(parts[1], 10) - 1;
+    const d = parseInt(parts[2], 10);
+    return `${MONTHS[mIdx].slice(0, 3)} ${d}, ${y}`;
+  };
+
+  const MONTHS = useMemo(() => [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+  ], []);
+
+  const daysInMonth = useMemo(() => {
+    return new Date(currentYear, currentMonth, 0).getDate();
+  }, [currentMonth, currentYear]);
+
+  const firstDayIndex = useMemo(() => {
+    return new Date(currentYear, currentMonth - 1, 1).getDay();
+  }, [currentMonth, currentYear]);
+
+  const calendarCells = useMemo(() => {
+    const cells = [];
+    for (let i = 0; i < firstDayIndex; i++) {
+      cells.push({ day: null, key: `empty-${i}` });
+    }
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${currentYear}-${String(currentMonth).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      cells.push({ day, dateStr, key: dateStr });
+    }
+    return cells;
+  }, [currentMonth, currentYear, daysInMonth, firstDayIndex]);
+
+  const handlePrevMonth = () => {
+    if (currentMonth === 1) {
+      setCurrentMonth(12);
+      setCurrentYear((y) => y - 1);
+    } else {
+      setCurrentMonth((m) => m - 1);
+    }
+  };
+
+  const handleNextMonth = () => {
+    if (currentMonth === 12) {
+      setCurrentMonth(1);
+      setCurrentYear((y) => y + 1);
+    } else {
+      setCurrentMonth((m) => m + 1);
+    }
+  };
 
   // Sync activeTab whenever the screen focuses (comes into view)
   useFocusEffect(
     React.useCallback(() => {
       if (route.params?.initialTab) {
         setActiveTab(route.params.initialTab);
+        setSelectedDate(null);
       }
     }, [route.params?.initialTab])
   );
+
+  useEffect(() => {
+    if (activeTab === "COMPLETED") {
+      setSelectedDate(null);
+    }
+  }, [activeTab]);
 
   // Auto-scroll FlatList to activeTab so it's centered in view
   useEffect(() => {
@@ -101,6 +178,7 @@ export const AssignedJobsScreen = () => {
   }, [activeTab]);
 
   const { data: jobs = [], isLoading, refetch, isRefetching } = useTechnicianJobs();
+  const { data: invoices = [], isLoading: isInvoicesLoading, refetch: refetchInvoices, isRefetching: isRefetchingInvoices } = useTechnicianInvoices();
 
   const handlePhoneCall = (num: string) => {
     Linking.openURL(`tel:${num}`);
@@ -129,27 +207,70 @@ export const AssignedJobsScreen = () => {
     }
   };
 
+  const invoiceTickets = useMemo(() => {
+    const list = Array.isArray(invoices) ? invoices : [];
+    return list.map((inv: any) => ({
+      id: inv.ticketId,
+      ticketNo: inv.ticket?.ticketNumber || inv.invoiceNumber,
+      service: `Invoice: #${inv.invoiceNumber}`,
+      status: "CLOSED" as TicketStatus,
+      customerName: inv.ticket?.customer?.name || "Client",
+      customerMobile: "",
+      description: `Payment Mode: ${inv.payment?.method || "N/A"}\nTotal Collected: ₹${inv.total}`,
+      scheduledDate: inv.generatedAt 
+        ? new Date(inv.generatedAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" })
+        : "—",
+      scheduledTime: inv.generatedAt
+        ? new Date(inv.generatedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" })
+        : "",
+      address: "—",
+      paymentCollection: Number(inv.total),
+      paymentMethod: inv.payment?.method,
+      scheduledDateRaw: inv.generatedAt ? inv.generatedAt.substring(0, 10) : "",
+      closedAt: inv.generatedAt ? String(inv.generatedAt) : undefined,
+    }));
+  }, [invoices]);
+
   // Status checks for filtering
   const filteredJobs = useMemo(() => {
+    if (activeTab === "COMPLETED") {
+      return invoiceTickets;
+    }
     const list = Array.isArray(jobs) ? jobs : [];
+    let tabFiltered = list;
     switch (activeTab) {
       case "ASSIGNED":
-        return list.filter((j) => j.status === "ASSIGNED" || j.status === "NEW");
+        tabFiltered = list.filter((j) => j.status === "ASSIGNED" || j.status === "NEW");
+        break;
       case "ACCEPTED":
-        return list.filter((j) => j.status === "ACCEPTED");
+        tabFiltered = list.filter((j) => j.status === "ACCEPTED");
+        break;
       case "IN_PROGRESS":
-        return list.filter((j) => j.status === "IN_PROGRESS" || j.status === "TRAVELLING" || j.status === "REACHED" || (j.status as string) === "INVOICE_GENERATED");
+        tabFiltered = list.filter((j) => j.status === "IN_PROGRESS" || j.status === "TRAVELLING" || j.status === "REACHED");
+        break;
       case "PENDING":
-        return list.filter((j) => j.status === "PENDING" || j.status === "RESCHEDULED");
-      case "COMPLETED":
-        return list.filter((j) => j.status === "COMPLETED" || j.status === "CLOSED");
+        tabFiltered = list.filter((j) => j.status === "PENDING" || j.status === "RESCHEDULED");
+        break;
+      case "ALL":
+        tabFiltered = [...list, ...invoiceTickets];
+        break;
       default:
-        return list;
+        tabFiltered = list;
     }
-  }, [jobs, activeTab]);
+
+    if (selectedDate) {
+      return tabFiltered.filter((j) => {
+        if (j.scheduledDateRaw === selectedDate) return true;
+        if (j.closedAt && j.closedAt.substring(0, 10) === selectedDate) return true;
+        if (j.invoiceGeneratedAt && j.invoiceGeneratedAt.substring(0, 10) === selectedDate) return true;
+        return false;
+      });
+    }
+    return tabFiltered;
+  }, [jobs, activeTab, selectedDate, invoiceTickets]);
 
   const renderJobCard = ({ item }: { item: any }) => {
-    const todayStr = new Date().toLocaleDateString("sv-SE");
+    const todayStr = getTodayStr();
     const isLocked = item.scheduledDateRaw ? item.scheduledDateRaw > todayStr : false;
 
     const statusColor = getLeftBorderColor(item.status);
@@ -295,6 +416,117 @@ export const AssignedJobsScreen = () => {
         onBackPress={() => navigation.goBack()}
       />
 
+      {/* Calendar Toggle Bar */}
+      <Pressable
+        onPress={() => setCalendarVisible(!calendarVisible)}
+        style={({ pressed }: { pressed: boolean }) => [
+          styles.toggleBar,
+          { backgroundColor: theme.colors.card, borderBottomColor: theme.colors.borderLight },
+          pressed && { opacity: 0.8 }
+        ]}
+      >
+        <View style={styles.toggleBarLeft}>
+          <Calendar size={18} color={theme.colors.primary} />
+          <Text style={[styles.toggleBarText, { color: theme.colors.text }]}>
+            {getSelectedDateText()}
+          </Text>
+        </View>
+
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          {selectedDate && (
+            <Pressable
+              onPress={(e) => {
+                e.stopPropagation();
+                setSelectedDate(null);
+              }}
+              style={({ pressed }: { pressed: boolean }) => [
+                styles.todayBtn,
+                { backgroundColor: `${theme.colors.primary}12`, opacity: pressed ? 0.7 : 1 }
+              ]}
+            >
+              <Text style={[styles.todayBtnText, { color: theme.colors.primary }]}>Show All</Text>
+            </Pressable>
+          )}
+          <ChevronDown
+            size={18}
+            color={theme.colors.textMuted}
+            style={{ transform: [{ rotate: calendarVisible ? "180deg" : "0deg" }] }}
+          />
+        </View>
+      </Pressable>
+
+      {/* Calendar Component */}
+      {calendarVisible && (
+        <View style={[styles.calendarContainer, { backgroundColor: theme.colors.card, borderBottomColor: theme.colors.borderLight }]}>
+          <View style={styles.calendarHeader}>
+            <Pressable onPress={handlePrevMonth} style={styles.navBtn}>
+              <ChevronLeft size={20} color={theme.colors.text} />
+            </Pressable>
+            <Text style={[styles.calendarTitle, { color: theme.colors.text }]}>
+              {MONTHS[currentMonth - 1]} {currentYear}
+            </Text>
+            <Pressable onPress={handleNextMonth} style={styles.navBtn}>
+              <ChevronRight size={20} color={theme.colors.text} />
+            </Pressable>
+          </View>
+
+          <View style={styles.weekDaysRow}>
+            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+              <Text key={day} style={[styles.weekDayText, { color: theme.colors.textMuted }]}>
+                {day}
+              </Text>
+            ))}
+          </View>
+
+          <View style={styles.daysGrid}>
+            {calendarCells.map((cell) => {
+              if (!cell.day) {
+                return <View key={cell.key} style={styles.dayCell} />;
+              }
+
+              const { day, dateStr } = cell;
+              const isSelected = selectedDate === dateStr;
+              const isToday = dateStr === getTodayStr();
+              const isFuture = dateStr ? dateStr > getTodayStr() : false;
+
+              return (
+                <Pressable
+                  key={cell.key}
+                  disabled={isFuture}
+                  onPress={() => {
+                    setSelectedDate(isSelected ? null : dateStr!);
+                    setCalendarVisible(false);
+                  }}
+                  style={({ pressed }: { pressed: boolean }) => [
+                    styles.dayCell,
+                    isSelected && { backgroundColor: theme.colors.primary, borderRadius: 20 },
+                    isToday && !isSelected && { borderWidth: 1.5, borderColor: theme.colors.primary, borderRadius: 20 },
+                    isFuture && { opacity: 0.3 },
+                    pressed && !isFuture && { opacity: 0.7 },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.dayText,
+                      {
+                        color: isSelected
+                          ? "#ffffff"
+                          : isFuture
+                          ? theme.colors.textLight
+                          : theme.colors.text,
+                        fontWeight: (isSelected || isToday) && !isFuture ? "700" : "400",
+                      },
+                    ]}
+                  >
+                    {day}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      )}
+
       {/* Pill Filter Tabs */}
       <View style={[styles.tabBar, { borderBottomColor: theme.colors.borderLight }]}>
         <FlatList
@@ -338,7 +570,7 @@ export const AssignedJobsScreen = () => {
       </View>
 
       {/* Main List */}
-      {isLoading && !isRefetching ? (
+      {(isLoading || (activeTab === "COMPLETED" && isInvoicesLoading)) && !(isRefetching || isRefetchingInvoices) ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
         </View>
@@ -349,8 +581,11 @@ export const AssignedJobsScreen = () => {
           renderItem={renderJobCard}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
-          refreshing={isRefetching}
-          onRefresh={refetch}
+          refreshing={isRefetching || isRefetchingInvoices}
+          onRefresh={() => {
+            refetch();
+            refetchInvoices();
+          }}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Wrench size={40} color={theme.colors.textLight} style={{ marginBottom: 12 }} />
@@ -378,6 +613,81 @@ export const AssignedJobsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  calendarContainer: {
+    padding: 16,
+    borderBottomWidth: 1,
+  },
+  calendarHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+  calendarTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  navBtn: {
+    padding: 8,
+  },
+  todayBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  todayBtnText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  weekDaysRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  weekDayText: {
+    width: "14%",
+    textAlign: "center",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  daysGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  dayCell: {
+    width: "14.28%",
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  dayText: {
+    fontSize: 14,
+  },
+  statusDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    position: "absolute",
+    bottom: 4,
+  },
+  toggleBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  toggleBarLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  toggleBarText: {
+    fontSize: 14,
+    fontWeight: "600",
   },
   tabBar: {
     borderBottomWidth: 1,

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -21,6 +21,7 @@ import {
   CheckCircle2,
   Receipt,
   Smartphone,
+  Trash2,
 } from "lucide-react-native";
 
 import { useTheme } from "../../theme";
@@ -51,14 +52,41 @@ export const PaymentCollectionScreen = () => {
   const completeJobMutation = useCompleteJob();
 
   const [paymentMode, setPaymentMode] = useState<PaymentMode>("CASH");
-  const [amountStr, setAmountStr] = useState(
+  const [baseAmountStr, setBaseAmountStr] = useState(
     initialAmount !== undefined ? String(initialAmount) : ""
   );
+  const [extraCharges, setExtraCharges] = useState<{ id: string; name: string; amountStr: string }[]>([]);
+  const [transactionId, setTransactionId] = useState("");
+
+  const addExtraCharge = () => {
+    setExtraCharges((prev) => [...prev, { id: Math.random().toString(), name: "", amountStr: "" }]);
+  };
+
+  const removeExtraCharge = (id: string) => {
+    setExtraCharges((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const updateExtraCharge = (id: string, field: "name" | "amountStr", value: string) => {
+    setExtraCharges((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, [field]: value } : item))
+    );
+  };
+
+  useEffect(() => {
+    if (job && initialAmount === undefined && !baseAmountStr) {
+      const defaultAmount = job.serviceCharge ?? job.categoryPrice ?? 0;
+      setBaseAmountStr(String(defaultAmount));
+    }
+  }, [job, initialAmount, baseAmountStr]);
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
 
-  const amount = parseFloat(amountStr) || 0;
-  const gstAmount = Math.round(amount - amount / 1.18);
-  const baseAmount = amount - gstAmount;
+  const percent = 18;
+  const baseAmount = parseFloat(baseAmountStr) || 0;
+  const extraChargesSum = extraCharges.reduce((sum, item) => sum + (parseFloat(item.amountStr) || 0), 0);
+  const totalBase = baseAmount + extraChargesSum;
+
+  const gstAmount = Math.round(((totalBase * percent) / 100) * 100) / 100;
+  const amount = Math.round((totalBase + gstAmount) * 100) / 100;
 
   const upiLink = buildUpiLink(amount);
 
@@ -67,16 +95,20 @@ export const PaymentCollectionScreen = () => {
       Alert.alert("Amount Required", "Please enter a valid payment amount.");
       return;
     }
+    if (paymentMode === "UPI" && !transactionId.trim()) {
+      Alert.alert("Transaction ID Required", "Please enter the UPI Transaction ID / Ref No.");
+      return;
+    }
     if (!paymentConfirmed) {
       Alert.alert("Confirm Payment", "Please toggle the payment confirmation before submitting.");
       return;
     }
 
     try {
-      // 1. Collect payment
+      // 1. Collect payment (send total base amount to backend, which calculates GST on top of it)
       const payResult = await collectMutation.mutateAsync({
         ticketNo: jobId,
-        amount,
+        amount: totalBase,
         paymentMethod: paymentMode,
       });
 
@@ -87,7 +119,7 @@ export const PaymentCollectionScreen = () => {
           beforePhotos: job?.beforePhotos ?? [],
           afterPhotos: job?.afterPhotos ?? [],
           customerSignature: "captured",
-          workNotes: job?.workNotes ?? "Completed",
+          workNotes: (job?.workNotes ? job.workNotes : "Completed") + (transactionId.trim() ? ` | UPI Txn ID: ${transactionId.trim()}` : ""),
           duration: "—",
           paymentCollection: amount,
           paymentMethod: paymentMode,
@@ -183,50 +215,115 @@ export const PaymentCollectionScreen = () => {
 
         {/* Amount Input */}
         <Text style={[styles.sectionLabel, { color: theme.colors.textMuted }]}>
-          Amount to Collect
+          Base Service Charge (Excl. GST)
         </Text>
         <View
           style={[
             styles.amountContainer,
             {
-              borderColor: amount > 0 ? theme.colors.primary : theme.colors.border,
-              backgroundColor: theme.colors.card,
+              borderColor: theme.colors.border,
+              backgroundColor: `${theme.colors.card}80`,
             },
           ]}
         >
-          <IndianRupee size={20} color={theme.colors.primary} />
+          <IndianRupee size={20} color={theme.colors.textMuted} />
           <TextInput
-            value={amountStr}
-            onChangeText={setAmountStr}
+            value={baseAmountStr}
+            onChangeText={setBaseAmountStr}
             placeholder="0.00"
             placeholderTextColor={theme.colors.textLight}
             keyboardType="decimal-pad"
-            style={[styles.amountInput, { color: theme.colors.text }]}
+            style={[styles.amountInput, { color: theme.colors.textMuted }]}
+            editable={false}
           />
+        </View>
+
+        {/* Extra Charges Section */}
+        <View style={{ marginTop: 16 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+            <Text style={[styles.sectionLabel, { color: theme.colors.textMuted, marginBottom: 0 }]}>
+              Extra Charges
+            </Text>
+            <Pressable
+              onPress={addExtraCharge}
+              style={({ pressed }) => [
+                styles.addExtraBtn,
+                { backgroundColor: `${theme.colors.primary}12`, opacity: pressed ? 0.7 : 1 }
+              ]}
+            >
+              <Text style={[styles.addExtraBtnText, { color: theme.colors.primary }]}>+ Add Item</Text>
+            </Pressable>
+          </View>
+
+          {extraCharges.map((item) => (
+            <View key={item.id} style={styles.extraRowInput}>
+              <TextInput
+                value={item.name}
+                onChangeText={(val) => updateExtraCharge(item.id, "name", val)}
+                placeholder="Charge Name (e.g. Spare Parts)"
+                placeholderTextColor={theme.colors.textLight}
+                style={[styles.extraNameInput, { color: theme.colors.text, borderColor: theme.colors.border, backgroundColor: theme.colors.card }]}
+              />
+              <View style={[styles.extraAmountWrapper, { borderColor: theme.colors.border, backgroundColor: theme.colors.card }]}>
+                <Text style={{ color: theme.colors.textMuted, fontSize: 14 }}>₹</Text>
+                <TextInput
+                  value={item.amountStr}
+                  onChangeText={(val) => updateExtraCharge(item.id, "amountStr", val)}
+                  placeholder="0.00"
+                  placeholderTextColor={theme.colors.textLight}
+                  keyboardType="decimal-pad"
+                  style={[styles.extraAmountInput, { color: theme.colors.text }]}
+                />
+              </View>
+              <Pressable
+                onPress={() => removeExtraCharge(item.id)}
+                style={({ pressed }) => [
+                  styles.removeExtraBtn,
+                  { opacity: pressed ? 0.7 : 1 }
+                ]}
+              >
+                <Trash2 size={18} color={theme.colors.danger} />
+              </Pressable>
+            </View>
+          ))}
         </View>
 
         {/* GST Breakdown */}
         {amount > 0 && (
-          <AppCard style={[styles.breakdownCard, { marginTop: 8 }]}>
+          <AppCard style={[styles.breakdownCard, { marginTop: 14 }]}>
             <View style={styles.breakdownRow}>
               <Text style={[styles.breakdownLabel, { color: theme.colors.textMuted }]}>
-                Base Amount
+                Base Service Charge
               </Text>
               <Text style={[styles.breakdownValue, { color: theme.colors.text }]}>
                 ₹{baseAmount.toLocaleString("en-IN")}
               </Text>
             </View>
+
+            {extraChargesSum > 0 && (
+              <View style={styles.breakdownRow}>
+                <Text style={[styles.breakdownLabel, { color: theme.colors.textMuted }]}>
+                  Extra Charges Total
+                </Text>
+                <Text style={[styles.breakdownValue, { color: theme.colors.text }]}>
+                  ₹{extraChargesSum.toLocaleString("en-IN")}
+                </Text>
+              </View>
+            )}
+
+
             <View style={styles.breakdownRow}>
               <Text style={[styles.breakdownLabel, { color: theme.colors.textMuted }]}>
-                GST (18%)
+                {percent > 0 ? `GST (${percent}%)` : "GST"}
               </Text>
               <Text style={[styles.breakdownValue, { color: theme.colors.text }]}>
                 ₹{gstAmount.toLocaleString("en-IN")}
               </Text>
             </View>
+
             <View style={[styles.divider, { backgroundColor: theme.colors.borderLight }]} />
             <View style={styles.breakdownRow}>
-              <Text style={[styles.totalLabel, { color: theme.colors.text }]}>Total</Text>
+              <Text style={[styles.totalLabel, { color: theme.colors.text }]}>Total Amount</Text>
               <Text style={[styles.totalValue, { color: theme.colors.primary }]}>
                 ₹{amount.toLocaleString("en-IN")}
               </Text>
@@ -328,6 +425,31 @@ export const PaymentCollectionScreen = () => {
             <Text style={[styles.qrPlaceholderText, { color: theme.colors.textMuted }]}>
               Enter amount above to generate QR code
             </Text>
+          </View>
+        )}
+
+        {/* UPI Transaction ID Input */}
+        {paymentMode === "UPI" && (
+          <View style={{ marginBottom: 16 }}>
+            <Text style={[styles.sectionLabel, { color: theme.colors.textMuted }]}>
+              UPI Transaction ID / Ref No. <Text style={{ color: theme.colors.danger }}>*</Text>
+            </Text>
+            <TextInput
+              value={transactionId}
+              onChangeText={setTransactionId}
+              placeholder="Enter UPI Transaction ID / UTR"
+              placeholderTextColor={theme.colors.textLight}
+              style={{
+                height: 48,
+                borderWidth: 1.5,
+                borderRadius: 10,
+                paddingHorizontal: 14,
+                fontSize: 15,
+                color: theme.colors.text,
+                borderColor: transactionId.trim() ? theme.colors.primary : theme.colors.border,
+                backgroundColor: theme.colors.card,
+              }}
+            />
           </View>
         )}
 
@@ -469,4 +591,48 @@ const styles = StyleSheet.create({
   confirmTitle: { fontSize: 14, fontWeight: "700" },
   confirmSubtitle: { fontSize: 12, marginTop: 2 },
   actions: { gap: 10 },
+  addExtraBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  addExtraBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  extraRowInput: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginVertical: 6,
+  },
+  extraNameInput: {
+    flex: 1.8,
+    height: 44,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    fontSize: 14,
+  },
+  extraAmountWrapper: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    height: 44,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    gap: 4,
+  },
+  extraAmountInput: {
+    flex: 1,
+    height: "100%",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  removeExtraBtn: {
+    padding: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  },
 });

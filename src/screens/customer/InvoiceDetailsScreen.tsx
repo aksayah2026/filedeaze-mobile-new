@@ -1,22 +1,41 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   Alert,
-  Linking,
+  Platform,
 } from "react-native";
 import { useRoute, useNavigation, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { FileText, Download, Printer, Percent, BadgeIndianRupee } from "lucide-react-native";
+import {
+  Download,
+  Share2,
+  CheckCircle2,
+  Receipt,
+  Tag,
+  Calendar,
+  MapPin,
+  CreditCard,
+  User,
+  Wrench,
+  PhoneCall,
+  IndianRupee,
+  Check,
+  Clock,
+} from "lucide-react-native";
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
+
 import { useTheme } from "../../theme";
 import { useCustomerInvoiceDetails } from "../../hooks/useCustomer";
 import { CustomerStackParamList } from "../../types/navigation.types";
 import { AppHeader } from "../../components/AppHeader";
 import { AppLoader } from "../../components/AppLoader";
-import { AppCard } from "../../components/AppCard";
 import { AppButton } from "../../components/AppButton";
+import { AppCard } from "../../components/AppCard";
+import { AppAlertModal } from "../../components/AppAlertModal";
 
 type NavigationProp = NativeStackNavigationProp<CustomerStackParamList, "InvoiceDetails">;
 type RouteProps = RouteProp<CustomerStackParamList, "InvoiceDetails">;
@@ -28,43 +47,23 @@ export const InvoiceDetailsScreen = () => {
   const { invoiceId } = route.params;
 
   const { data: invoiceData, isLoading } = useCustomerInvoiceDetails(invoiceId);
+  const [downloading, setDownloading] = useState(false);
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState("");
+  const [alertMessage, setAlertMessage] = useState("");
+  const [alertType, setAlertType] = useState<"success" | "error" | "warning">("success");
 
-  if (isLoading) {
-    return (
-      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        <AppHeader showBack onBackPress={() => navigation.goBack()} title="Invoice Details" />
-        <AppLoader message="Retrieving invoice details..." />
-      </View>
-    );
-  }
-
-  if (!invoiceData) {
-    return (
-      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        <AppHeader showBack onBackPress={() => navigation.goBack()} title="Invoice Details" />
-        <View style={styles.errorContent}>
-          <Text style={{ color: theme.colors.textMuted }}>Invoice not found.</Text>
-        </View>
-      </View>
-    );
-  }
-
-  const { invoice, tenant } = invoiceData;
-
-  const handleDownload = () => {
-    if (invoice.pdfUrl) {
-      Linking.openURL(invoice.pdfUrl).catch(() => {
-        Alert.alert("Error", "Could not open document download link");
-      });
-    } else {
-      Alert.alert("Download Initiated", `PDF for invoice ${invoice.invoiceNumber} downloaded successfully!`);
-    }
+  const showAlert = (title: string, message: string, type: "success" | "error" | "warning" = "success") => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertType(type);
+    setAlertVisible(true);
   };
 
-  const formatDate = (dateStr: string) => {
+  const formatDate = (dateStr: string | null | undefined) => {
+    if (!dateStr) return "—";
     try {
-      const d = new Date(dateStr);
-      return d.toLocaleDateString("en-IN", {
+      return new Date(dateStr).toLocaleDateString("en-IN", {
         day: "2-digit",
         month: "short",
         year: "numeric",
@@ -74,228 +73,506 @@ export const InvoiceDetailsScreen = () => {
     }
   };
 
+  const formatDateTime = (dateStr: string | null | undefined) => {
+    if (!dateStr) return "—";
+    try {
+      return new Date(dateStr).toLocaleString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const generatePDFHtml = (invoice: any, tenant: any) => {
+    const isPaid = invoice.payment?.status === "COLLECTED" || invoice.payment?.status === "PAID";
+    const gstLabel = invoice.gstPercent > 0 ? `GST (${invoice.gstPercent}%)` : 'GST';
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Invoice #${invoice.invoiceNumber}</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background: #f8fafc; padding: 30px; color: #1e293b; }
+          .invoice-wrap { max-width: 640px; margin: auto; background: #fff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 24px rgba(0,0,0,0.07); }
+          .top-bar { height: 6px; background: linear-gradient(to right, #3b82f6, #6366f1); }
+          .invoice-body { padding: 32px; }
+          .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
+          .brand-name { font-size: 22px; font-weight: 900; color: #3b82f6; letter-spacing: 0.5px; }
+          .brand-sub { font-size: 11px; color: #94a3b8; font-weight: 600; margin-top: 3px; text-transform: uppercase; }
+          .company-sub { font-size: 11px; color: #64748b; margin-top: 4px; }
+          .paid-badge { display: flex; align-items: center; gap: 6px; background: ${isPaid ? "#d1fae5" : "#fef3c7"}; color: ${isPaid ? "#065f46" : "#92400e"}; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 800; letter-spacing: 0.5px; }
+          .divider { height: 1px; background: #e2e8f0; margin: 20px 0; }
+          .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+          .meta-label { font-size: 9px; font-weight: 700; color: #94a3b8; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 4px; }
+          .meta-value { font-size: 14px; font-weight: 700; color: #1e293b; }
+          .meta-value-sub { font-size: 12px; color: #64748b; margin-top: 2px; }
+          .items-table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+          .items-table thead { background: #f1f5f9; }
+          .items-table th { padding: 10px 12px; font-size: 11px; font-weight: 700; color: #64748b; text-align: left; text-transform: uppercase; letter-spacing: 0.5px; }
+          .items-table td { padding: 12px; font-size: 13px; color: #1e293b; border-bottom: 1px solid #f1f5f9; }
+          .items-table .td-right { text-align: right; font-weight: 600; }
+          .totals-section { background: #f8fafc; border-radius: 10px; padding: 16px; margin-top: 16px; }
+          .totals-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; font-size: 13px; color: #64748b; }
+          .totals-row.grand { font-size: 17px; font-weight: 800; color: #3b82f6; border-top: 2px solid #e2e8f0; margin-top: 10px; padding-top: 12px; }
+          .payment-box { background: #eff6ff; border-radius: 10px; padding: 14px; margin-top: 16px; display: flex; justify-content: space-between; align-items: center; }
+          .payment-label { font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+          .payment-val { font-size: 14px; font-weight: 700; color: #1e293b; margin-top: 4px; }
+          .footer { text-align: center; margin-top: 32px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8; line-height: 1.6; }
+          .footer strong { color: #3b82f6; }
+        </style>
+      </head>
+      <body>
+        <div class="invoice-wrap">
+          <div class="top-bar"></div>
+          <div class="invoice-body">
+            <div class="header">
+              <div>
+                <div class="brand-name">${tenant?.companyName || "FIELDEAZE"}</div>
+                <div class="brand-sub">Reliable On-Demand Services</div>
+                ${tenant?.address ? `<div class="company-sub">${tenant.address}${tenant.city ? ", " + tenant.city : ""}${tenant.state ? ", " + tenant.state : ""}</div>` : ""}
+                ${tenant?.phone ? `<div class="company-sub">Ph: ${tenant.phone}</div>` : ""}
+              </div>
+              <div class="paid-badge">${isPaid ? "PAID" : "PENDING"}</div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="meta-grid">
+              <div>
+                <div class="meta-label">Invoice Number</div>
+                <div class="meta-value">#${invoice.invoiceNumber}</div>
+              </div>
+              <div style="text-align:right;">
+                <div class="meta-label">Invoice Date</div>
+                <div class="meta-value">${formatDate(invoice.generatedAt)}</div>
+              </div>
+              <div>
+                <div class="meta-label">Ticket Number</div>
+                <div class="meta-value">${invoice.ticket?.ticketNumber || "—"}</div>
+              </div>
+              <div style="text-align:right;">
+                <div class="meta-label">Service</div>
+                <div class="meta-value">${invoice.ticket?.subCategory?.name || "General Service"}</div>
+                <div class="meta-value-sub">${invoice.ticket?.subCategory?.category?.name || ""}</div>
+              </div>
+              ${invoice.ticket?.technician ? `
+              <div>
+                <div class="meta-label">Technician</div>
+                <div class="meta-value">${invoice.ticket.technician.name}</div>
+                <div class="meta-value-sub">Ph: ${invoice.ticket.technician.phone}</div>
+              </div>` : ""}
+            </div>
+
+            <div class="divider"></div>
+
+            <table class="items-table">
+              <thead>
+                <tr>
+                  <th>Service Item</th>
+                  <th style="text-align:right;">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <strong>${invoice.ticket?.subCategory?.name || "General Service"}</strong><br>
+                    <span style="font-size:11px;color:#94a3b8;">${invoice.ticket?.description || invoice.ticket?.subCategory?.category?.name || ""}</span>
+                  </td>
+                  <td class="td-right">₹${Number(invoice.subtotal || 0).toLocaleString("en-IN")}</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div class="totals-section">
+              <div class="totals-row"><span>Base Charges</span><span>₹${Number(invoice.subtotal || 0).toLocaleString("en-IN")}</span></div>
+              <div class="totals-row"><span>${gstLabel}</span><span>₹${Number(invoice.gstAmount || 0).toLocaleString("en-IN")}</span></div>
+              <div class="totals-row grand"><span>Total Amount</span><span>₹${Number(invoice.total || 0).toLocaleString("en-IN")}</span></div>
+            </div>
+
+            ${invoice.payment ? `
+            <div class="payment-box">
+              <div>
+                <div class="payment-label">Payment Method</div>
+                <div class="payment-val">${invoice.payment.method || "—"}</div>
+              </div>
+              <div style="text-align:right;">
+                <div class="payment-label">Payment Status</div>
+                <div class="payment-val" style="color:${isPaid ? "#059669" : "#d97706"}">${isPaid ? "Collected" : invoice.payment.status}</div>
+              </div>
+              ${invoice.payment.collectedAt ? `
+              <div style="text-align:right;">
+                <div class="payment-label">Collected At</div>
+                <div class="payment-val">${formatDate(invoice.payment.collectedAt)}</div>
+              </div>` : ""}
+            </div>` : ""}
+
+            <div class="footer">
+              Thank you for choosing <strong>${tenant?.companyName || "FieldEaze"}</strong>!<br>
+              For queries: ${tenant?.email || "support@fieldeaze.com"}${tenant?.phone ? " | " + tenant.phone : ""}
+            </div>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  };
+
+  const handleDownload = async () => {
+    if (!invoiceData) return;
+    try {
+      setDownloading(true);
+      const html = generatePDFHtml(invoiceData.invoice, invoiceData.tenant);
+      const { uri } = await Print.printToFileAsync({ html });
+      if (Platform.OS === "ios") {
+        await Sharing.shareAsync(uri);
+      } else {
+        await Print.printAsync({ uri });
+      }
+      showAlert("Success", `Invoice #${invoiceData.invoice.invoiceNumber} is ready.`, "success");
+    } catch (err: any) {
+      showAlert("Download Failed", err.message || "Failed to generate invoice PDF.", "error");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const handleShare = async () => {
+    if (!invoiceData) return;
+    try {
+      const html = generatePDFHtml(invoiceData.invoice, invoiceData.tenant);
+      const { uri } = await Print.printToFileAsync({ html });
+      await Sharing.shareAsync(uri, {
+        mimeType: "application/pdf",
+        dialogTitle: `Share Invoice #${invoiceData.invoice.invoiceNumber}`,
+        UTI: "com.adobe.pdf",
+      });
+    } catch (err: any) {
+      showAlert("Share Failed", err.message || "Failed to share invoice.", "error");
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <AppHeader showBack onBackPress={() => navigation.goBack()} title="Invoice Details" />
+        <AppLoader message="Loading invoice..." />
+      </View>
+    );
+  }
+
+  if (!invoiceData) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <AppHeader showBack onBackPress={() => navigation.goBack()} title="Invoice Details" />
+        <View style={styles.centerContent}>
+          <Text style={{ color: theme.colors.textMuted, fontSize: 14 }}>Invoice not found.</Text>
+        </View>
+      </View>
+    );
+  }
+
+  const { invoice, tenant } = invoiceData;
+  const isPaid = invoice.payment?.status === "COLLECTED" || invoice.payment?.status === "PAID";
+  const paymentStatusColor = isPaid ? theme.colors.success : theme.colors.warning;
+
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <AppHeader showBack onBackPress={() => navigation.goBack()} title="Invoice Details" />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Main Details Card */}
-        <AppCard style={styles.card}>
-          <View style={styles.invoiceRow}>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Text style={[styles.label, { color: theme.colors.textMuted }]}>Invoice Number</Text>
-              <Text style={{ color: theme.colors.danger, fontWeight: "bold" }}> *</Text>
-              <Text style={[styles.invoiceNumber, { color: theme.colors.text }]}>: {invoice.invoiceNumber}</Text>
+
+        {/* Premium Invoice Sheet */}
+        <AppCard style={[styles.invoiceSheet, { borderColor: theme.colors.border }]}>
+
+          {/* Branded Header */}
+          <View style={styles.invoiceHeader}>
+            <View>
+              <Text style={[styles.brandName, { color: theme.colors.primary }]}>
+                {tenant?.companyName || "FIELDEAZE"}
+              </Text>
+              <Text style={[styles.brandSub, { color: theme.colors.textMuted }]}>
+                Reliable On-Demand Services
+              </Text>
+              {tenant?.address && (
+                <Text style={[styles.tenantAddress, { color: theme.colors.textMuted }]}>
+                  {tenant.address}{tenant.city ? `, ${tenant.city}` : ""}{tenant.state ? `, ${tenant.state}` : ""}
+                </Text>
+              )}
             </View>
-          </View>
-
-          <View style={styles.invoiceRow}>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Percent size={16} color={theme.colors.textMuted} style={{ marginRight: 6 }} />
-              <Text style={[styles.label, { color: theme.colors.textMuted }]}>GST (18%)</Text>
-              <Text style={{ color: theme.colors.danger, fontWeight: "bold" }}> *</Text>
-              <Text style={[styles.invoiceVal, { color: theme.colors.text }]}>: ₹{invoice.gst}</Text>
+            <View style={[styles.paidBadge, { backgroundColor: `${paymentStatusColor}18` }]}>
+              {isPaid ? (
+                <Check size={13} color={paymentStatusColor} style={{ marginRight: 4 }} />
+              ) : (
+                <Clock size={13} color={paymentStatusColor} style={{ marginRight: 4 }} />
+              )}
+              <Text style={[styles.paidText, { color: paymentStatusColor }]}>
+                {isPaid ? "PAID" : (invoice.payment?.status || "PENDING")}
+              </Text>
             </View>
-          </View>
-
-          <View style={styles.invoiceRow}>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <BadgeIndianRupee size={16} color={theme.colors.primary} style={{ marginRight: 6 }} />
-              <Text style={[styles.label, { color: theme.colors.textMuted }]}>Total Amount</Text>
-              <Text style={{ color: theme.colors.danger, fontWeight: "bold" }}> *</Text>
-              <Text style={[styles.totalAmountVal, { color: theme.colors.primary }]}>: ₹{invoice.total}</Text>
-            </View>
-          </View>
-        </AppCard>
-
-        {/* PDF Preview Container */}
-        <View style={styles.previewHeaderRow}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>PDF Preview</Text>
-          <Text style={{ color: theme.colors.danger, fontWeight: "bold" }}> *</Text>
-        </View>
-
-        <View style={[styles.pdfPreviewContainer, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-          {/* Stylized Document Layout */}
-          <View style={styles.pdfHeader}>
-            <Text style={[styles.companyName, { color: theme.colors.text }]}>{tenant.companyName}</Text>
-            <Text style={[styles.companyDetails, { color: theme.colors.textMuted }]}>
-              {tenant.address}, {tenant.city}, {tenant.state}
-            </Text>
-            <Text style={[styles.companyDetails, { color: theme.colors.textMuted }]}>
-              Phone: {tenant.phone} | Email: {tenant.email}
-            </Text>
           </View>
 
           <View style={[styles.divider, { backgroundColor: theme.colors.borderLight }]} />
 
-          <View style={styles.invoiceMetaDetails}>
+          {/* Invoice Meta */}
+          <View style={styles.metaGrid}>
             <View>
-              <Text style={styles.metaTitle}>Invoice To:</Text>
-              <Text style={styles.metaVal}>Valued FieldEaze Customer</Text>
-              <Text style={styles.metaVal}>{invoice.ticket?.description ? invoice.ticket.description.substring(0, 30) + "..." : "Service Address"}</Text>
+              <Text style={[styles.metaLabel, { color: theme.colors.textMuted }]}>INVOICE NUMBER</Text>
+              <Text style={[styles.metaValue, { color: theme.colors.text }]}>#{invoice.invoiceNumber}</Text>
             </View>
             <View style={{ alignItems: "flex-end" }}>
-              <Text style={styles.metaTitle}>Invoice details:</Text>
-              <Text style={styles.metaVal}>Date: {formatDate(invoice.generatedAt)}</Text>
-              <Text style={styles.metaVal}>No: {invoice.invoiceNumber}</Text>
+              <Text style={[styles.metaLabel, { color: theme.colors.textMuted }]}>DATE</Text>
+              <Text style={[styles.metaValue, { color: theme.colors.text }]}>{formatDate(invoice.generatedAt)}</Text>
+            </View>
+          </View>
+
+          <View style={[styles.metaGrid, { marginTop: 12 }]}>
+            <View>
+              <Text style={[styles.metaLabel, { color: theme.colors.textMuted }]}>TICKET NUMBER</Text>
+              <Text style={[styles.metaValue, { color: theme.colors.text }]}>
+                {invoice.ticket?.ticketNumber || "—"}
+              </Text>
+            </View>
+            <View style={{ alignItems: "flex-end" }}>
+              <Text style={[styles.metaLabel, { color: theme.colors.textMuted }]}>PRIORITY</Text>
+              <Text style={[styles.metaValue, { color: theme.colors.text }]}>
+                {invoice.ticket?.priority || "—"}
+              </Text>
             </View>
           </View>
 
           <View style={[styles.divider, { backgroundColor: theme.colors.borderLight }]} />
 
-          {/* Table Breakdown */}
-          <View style={styles.table}>
-            <View style={[styles.tableHeader, { backgroundColor: theme.colors.background }]}>
-              <Text style={[styles.tableHeaderCell, { color: theme.colors.text, flex: 2 }]}>Item Description</Text>
-              <Text style={[styles.tableHeaderCell, { color: theme.colors.text, textAlign: "right" }]}>Amount</Text>
-            </View>
-            <View style={styles.tableRow}>
-              <Text style={[styles.tableCell, { color: theme.colors.text, flex: 2 }]}>
-                {invoice.ticket?.subCategory?.name || "General Service Charge"}
+          {/* Service Info */}
+          <Text style={[styles.sectionHeading, { color: theme.colors.textMuted }]}>SERVICE DETAILS</Text>
+          <View style={styles.itemRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.itemName, { color: theme.colors.text }]}>
+                {invoice.ticket?.subCategory?.name || "General Service"}
               </Text>
-              <Text style={[styles.tableCell, { color: theme.colors.text, textAlign: "right" }]}>₹{invoice.amount}</Text>
-            </View>
-            <View style={styles.tableRow}>
-              <Text style={[styles.tableCell, { color: theme.colors.textMuted, flex: 2, fontStyle: "italic" }]}>
-                GST (18% applied)
+              <Text style={[styles.itemCategory, { color: theme.colors.textMuted }]}>
+                {invoice.ticket?.subCategory?.category?.name || ""}
               </Text>
-              <Text style={[styles.tableCell, { color: theme.colors.textMuted, textAlign: "right" }]}>₹{invoice.gst}</Text>
+              {invoice.ticket?.description && (
+                <Text style={[styles.itemDesc, { color: theme.colors.textMuted }]} numberOfLines={2}>
+                  {invoice.ticket.description}
+                </Text>
+              )}
             </View>
+            <Text style={[styles.itemPrice, { color: theme.colors.text }]}>
+              ₹{Number(invoice.subtotal || 0).toLocaleString("en-IN")}
+            </Text>
+          </View>
 
-            <View style={[styles.divider, { backgroundColor: theme.colors.borderLight }]} />
+          {/* Technician Info */}
+          {invoice.ticket?.technician && (
+            <View style={[styles.techBox, { backgroundColor: `${theme.colors.primary}08`, borderColor: `${theme.colors.primary}20` }]}>
+              <View style={styles.techRow}>
+                <User size={13} color={theme.colors.primary} style={{ marginRight: 6 }} />
+                <Text style={[styles.techLabel, { color: theme.colors.textMuted }]}>Technician</Text>
+                <Text style={[styles.techValue, { color: theme.colors.text }]}>
+                  {"  "}{invoice.ticket.technician.name}
+                </Text>
+              </View>
+              <View style={[styles.techRow, { marginTop: 4 }]}>
+                <PhoneCall size={13} color={theme.colors.primary} style={{ marginRight: 6 }} />
+                <Text style={[styles.techLabel, { color: theme.colors.textMuted }]}>Contact</Text>
+                <Text style={[styles.techValue, { color: theme.colors.text }]}>
+                  {"  "}{invoice.ticket.technician.phone}
+                </Text>
+              </View>
+            </View>
+          )}
 
+          <View style={[styles.divider, { backgroundColor: theme.colors.borderLight }]} />
+
+          {/* Totals Block */}
+          <View style={[styles.totalsBlock, { backgroundColor: `${theme.colors.primary}06` }]}>
             <View style={styles.totalRow}>
-              <Text style={[styles.totalCell, { color: theme.colors.text }]}>Grand Total:</Text>
-              <Text style={[styles.totalCell, { color: theme.colors.primary, textAlign: "right" }]}>₹{invoice.total}</Text>
+              <Text style={[styles.totalLabel, { color: theme.colors.textMuted }]}>Base Charges</Text>
+              <Text style={[styles.totalVal, { color: theme.colors.text }]}>
+                ₹{Number(invoice.subtotal || 0).toLocaleString("en-IN")}
+              </Text>
+            </View>
+            <View style={[styles.totalRow, { marginTop: 8 }]}>
+              <Text style={[styles.totalLabel, { color: theme.colors.textMuted }]}>
+                {invoice.gstPercent > 0 ? `GST (${invoice.gstPercent}%)` : 'GST'}
+              </Text>
+              <Text style={[styles.totalVal, { color: theme.colors.text }]}>
+                ₹{Number(invoice.gstAmount || 0).toLocaleString("en-IN")}
+              </Text>
+            </View>
+            <View style={[styles.divider, { backgroundColor: theme.colors.borderLight }]} />
+            <View style={styles.totalRow}>
+              <Text style={[styles.grandTotalLabel, { color: theme.colors.text }]}>Total Amount</Text>
+              <Text style={[styles.grandTotalVal, { color: theme.colors.primary }]}>
+                ₹{Number(invoice.total || 0).toLocaleString("en-IN")}
+              </Text>
             </View>
           </View>
-        </View>
 
-        {/* Action Button */}
-        <AppButton
-          title="Download PDF"
-          onPress={handleDownload}
-          icon={<Download size={18} color="#ffffff" style={{ marginRight: 8 }} />}
-          style={{ marginTop: 24, marginBottom: 40 }}
-        />
+          {/* Payment Info */}
+          {invoice.payment && (
+            <>
+              <View style={[styles.divider, { backgroundColor: theme.colors.borderLight }]} />
+              <Text style={[styles.sectionHeading, { color: theme.colors.textMuted }]}>PAYMENT DETAILS</Text>
+              <View style={styles.paymentGrid}>
+                <View>
+                  <Text style={[styles.metaLabel, { color: theme.colors.textMuted }]}>METHOD</Text>
+                  <View style={styles.methodRow}>
+                    <CreditCard size={13} color={theme.colors.primary} style={{ marginRight: 5 }} />
+                    <Text style={[styles.metaValue, { color: theme.colors.text }]}>
+                      {invoice.payment.method || "—"}
+                    </Text>
+                  </View>
+                </View>
+                <View style={{ alignItems: "flex-end" }}>
+                  <Text style={[styles.metaLabel, { color: theme.colors.textMuted }]}>STATUS</Text>
+                  <View style={[styles.statusPill, { backgroundColor: `${paymentStatusColor}15` }]}>
+                    <Text style={[styles.statusPillText, { color: paymentStatusColor }]}>
+                      {isPaid ? "✓ Collected" : invoice.payment.status}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+              {invoice.payment.collectedAt && (
+                <View style={[styles.metaGrid, { marginTop: 10 }]}>
+                  <View>
+                    <Text style={[styles.metaLabel, { color: theme.colors.textMuted }]}>COLLECTED AT</Text>
+                    <Text style={[styles.metaValueSm, { color: theme.colors.text }]}>
+                      {formatDateTime(invoice.payment.collectedAt)}
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </>
+          )}
+        </AppCard>
+
+        {/* Action Buttons */}
+        <View style={styles.btnRow}>
+          <AppButton
+            title={downloading ? "Generating..." : "Download PDF"}
+            onPress={handleDownload}
+            variant="outline"
+            style={{ flex: 1 }}
+            loading={downloading}
+            icon={<Download size={16} color={theme.colors.primary} style={{ marginRight: 6 }} />}
+          />
+          <AppButton
+            title="Share"
+            onPress={handleShare}
+            variant="outline"
+            style={{ flex: 1 }}
+            icon={<Share2 size={16} color={theme.colors.primary} style={{ marginRight: 6 }} />}
+          />
+        </View>
       </ScrollView>
+
+      <AppAlertModal
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        type={alertType}
+        onClose={() => setAlertVisible(false)}
+      />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  container: { flex: 1 },
+  scrollContent: { padding: 16, paddingBottom: 40 },
+  centerContent: { flex: 1, justifyContent: "center", alignItems: "center" },
+
+  invoiceSheet: {
+    padding: 20,
+    borderRadius: 18,
+    borderWidth: 1,
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    elevation: 4,
   },
-  scrollContent: {
-    padding: 16,
+  invoiceHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 4,
   },
-  card: {
-    marginBottom: 16,
-    padding: 16,
-  },
-  invoiceRow: {
+  brandName: { fontSize: 20, fontWeight: "900", letterSpacing: 0.5 },
+  brandSub: { fontSize: 10, fontWeight: "600", textTransform: "uppercase", marginTop: 2, letterSpacing: 0.5 },
+  tenantAddress: { fontSize: 10, marginTop: 3, lineHeight: 14 },
+  paidBadge: {
     flexDirection: "row",
     alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  paidText: { fontSize: 11, fontWeight: "800", letterSpacing: 0.5 },
+
+  divider: { height: 1, marginVertical: 14 },
+
+  metaGrid: { flexDirection: "row", justifyContent: "space-between" },
+  metaLabel: { fontSize: 9, fontWeight: "700", letterSpacing: 1, textTransform: "uppercase", marginBottom: 3 },
+  metaValue: { fontSize: 13, fontWeight: "700" },
+  metaValueSm: { fontSize: 12, fontWeight: "600" },
+
+  sectionHeading: {
+    fontSize: 9,
+    fontWeight: "700",
+    letterSpacing: 1,
+    textTransform: "uppercase",
     marginBottom: 10,
   },
-  label: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  invoiceNumber: {
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  invoiceVal: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  totalAmountVal: {
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  previewHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  sectionTitle: {
-    fontSize: 11,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
-    marginVertical: 12,
-  },
-  pdfPreviewContainer: {
-    borderRadius: 8,
-    borderWidth: 1.5,
-    padding: 16,
-  },
-  pdfHeader: {
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  companyName: {
-    fontSize: 16,
-    fontWeight: "800",
-    textTransform: "uppercase",
-    marginBottom: 4,
-  },
-  companyDetails: {
-    fontSize: 11,
-    lineHeight: 14,
-    textAlign: "center",
-  },
-  divider: {
-    height: 1,
-    marginVertical: 12,
-  },
-  invoiceMetaDetails: {
+
+  itemRow: {
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 12,
   },
-  metaTitle: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#64748b",
+  itemName: { fontSize: 15, fontWeight: "700", marginBottom: 2 },
+  itemCategory: { fontSize: 12, marginBottom: 3 },
+  itemDesc: { fontSize: 11, lineHeight: 15 },
+  itemPrice: { fontSize: 15, fontWeight: "700" },
+
+  techBox: {
+    borderRadius: 10,
+    borderWidth: 1,
+    padding: 12,
+    marginTop: 4,
     marginBottom: 4,
   },
-  metaVal: {
-    fontSize: 12,
-    lineHeight: 16,
+  techRow: { flexDirection: "row", alignItems: "center" },
+  techLabel: { fontSize: 11, fontWeight: "600" },
+  techValue: { fontSize: 12, fontWeight: "700" },
+
+  totalsBlock: {
+    borderRadius: 12,
+    padding: 14,
   },
-  table: {
-    marginTop: 8,
-  },
-  tableHeader: {
-    flexDirection: "row",
-    padding: 8,
-    borderRadius: 4,
-  },
-  tableHeaderCell: {
-    fontSize: 11,
-    fontWeight: "700",
-  },
-  tableRow: {
-    flexDirection: "row",
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-  },
-  tableCell: {
-    fontSize: 12,
-  },
-  totalRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingHorizontal: 8,
-  },
-  totalCell: {
-    fontSize: 14,
-    fontWeight: "800",
-  },
-  errorContent: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
+  totalRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  totalLabel: { fontSize: 13 },
+  totalVal: { fontSize: 13, fontWeight: "600" },
+  grandTotalLabel: { fontSize: 15, fontWeight: "700" },
+  grandTotalVal: { fontSize: 20, fontWeight: "900" },
+
+  paymentGrid: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 },
+  methodRow: { flexDirection: "row", alignItems: "center", marginTop: 3 },
+  statusPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, marginTop: 3 },
+  statusPillText: { fontSize: 11, fontWeight: "700" },
+
+  btnRow: { flexDirection: "row", gap: 12 },
 });
+
+export default InvoiceDetailsScreen;

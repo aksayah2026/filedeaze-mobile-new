@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -40,6 +40,7 @@ export const ResetPasswordScreen = () => {
   const {
     control,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<ResetPasswordInput>({
     resolver: zodResolver(resetPasswordSchema),
@@ -49,6 +50,12 @@ export const ResetPasswordScreen = () => {
       confirmPassword: "",
     },
   });
+
+  useEffect(() => {
+    if (routeToken) {
+      setValue("token", routeToken);
+    }
+  }, [routeToken, setValue]);
 
   const onSubmit = async (data: ResetPasswordInput) => {
     setLoading(true);
@@ -97,9 +104,11 @@ export const ResetPasswordScreen = () => {
         </Text>
 
         <AppCard style={styles.formCard}>
-          {error && (
+          {(error || errors.token) && (
             <View style={[styles.errorContainer, { backgroundColor: `${theme.colors.danger}12` }]}>
-              <Text style={[styles.errorText, { color: theme.colors.danger }]}>{error}</Text>
+              <Text style={[styles.errorText, { color: theme.colors.danger }]}>
+                {error || errors.token?.message}
+              </Text>
             </View>
           )}
 

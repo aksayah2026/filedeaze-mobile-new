@@ -8,7 +8,7 @@ import {
 } from "react-native";
 import { useRoute, useNavigation, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { MapPin, Clock, Navigation, CheckCircle2 } from "lucide-react-native";
+import { MapPin, Clock, Navigation, CheckCircle2, Tag, ShieldCheck } from "lucide-react-native";
 import * as Location from "expo-location";
 
 import { useTheme } from "../../theme";
@@ -18,6 +18,8 @@ import { AppHeader } from "../../components/AppHeader";
 import { AppCard } from "../../components/AppCard";
 import { AppButton } from "../../components/AppButton";
 import { AppLoader } from "../../components/AppLoader";
+import { AppSuccessModal } from "../../components/AppSuccessModal";
+import { AppAlertModal } from "../../components/AppAlertModal";
 
 type RouteProps = RouteProp<TechnicianStackParamList, "ReachLocation">;
 type NavigationProp = NativeStackNavigationProp<TechnicianStackParamList, "ReachLocation">;
@@ -35,6 +37,21 @@ export const ReachLocationScreen = () => {
   const [gpsLoading, setGpsLoading] = useState(false);
   const [gpsError, setGpsError] = useState<string | null>(null);
   const [timestamp, setTimestamp] = useState<string | null>(null);
+  const [locationName, setLocationName] = useState<string | null>(null);
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
+
+  // Styled alert popup states
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState("");
+  const [alertMessage, setAlertMessage] = useState("");
+  const [alertType, setAlertType] = useState<"success" | "error" | "warning">("warning");
+
+  const showAlert = (title: string, message: string, type: "success" | "error" | "warning" = "warning") => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertType(type);
+    setAlertVisible(true);
+  };
 
   // Auto-fetch GPS on mount
   useEffect(() => {
@@ -44,6 +61,7 @@ export const ReachLocationScreen = () => {
   const fetchGPS = async () => {
     setGpsLoading(true);
     setGpsError(null);
+    setLocationName(null);
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
@@ -55,16 +73,44 @@ export const ReachLocationScreen = () => {
       const loc = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.High,
       });
-      setGpsCoords({
+      const coords = {
         lat: parseFloat(loc.coords.latitude.toFixed(6)),
         lng: parseFloat(loc.coords.longitude.toFixed(6)),
-      });
+      };
+      setGpsCoords(coords);
       setTimestamp(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+
+      // Reverse geocode to get current location name/address
+      try {
+        const geocode = await Location.reverseGeocodeAsync({
+          latitude: loc.coords.latitude,
+          longitude: loc.coords.longitude,
+        });
+        if (geocode && geocode.length > 0) {
+          const item = geocode[0];
+          const parts = [
+            item.name,
+            item.street,
+            item.district,
+            item.city,
+            item.region,
+            item.postalCode,
+            item.country,
+          ].filter(Boolean);
+          setLocationName(parts.join(", "));
+        } else {
+          setLocationName(`${coords.lat}, ${coords.lng}`);
+        }
+      } catch (geoErr) {
+        setLocationName(`${coords.lat}, ${coords.lng}`);
+      }
     } catch (e) {
       setGpsError("Could not fetch GPS. Using fallback coordinates.");
       // Fallback for simulator
-      setGpsCoords({ lat: 28.6139, lng: 77.2090 });
+      const fallback = { lat: 28.6139, lng: 77.2090 };
+      setGpsCoords(fallback);
       setTimestamp(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+      setLocationName("New Delhi, Delhi, India");
     } finally {
       setGpsLoading(false);
     }
@@ -72,20 +118,21 @@ export const ReachLocationScreen = () => {
 
   const handleMarkReached = async () => {
     if (!gpsCoords) {
-      Alert.alert("GPS Required", "Please wait for GPS coordinates to be captured.");
+      showAlert("GPS Required", "Please wait for GPS coordinates to be captured.", "warning");
       return;
     }
 
     try {
-      await reachMutation.mutateAsync({ ticketId: jobId, status: "REACHED" }); // CHANGED: Rename ticketNo to ticketId for UUID routing
-      Alert.alert(
-        "Marked as Reached ✓",
-        `Location recorded at ${timestamp}.\nCoords: ${gpsCoords.lat}, ${gpsCoords.lng}`,
-        [{ text: "Proceed", onPress: () => navigation.navigate("TechnicianHome") }]
-      );
+      await reachMutation.mutateAsync({ ticketId: jobId, status: "REACHED" });
+      setSuccessModalVisible(true);
     } catch (err: any) {
-      Alert.alert("Error", err.message || "Failed to update status.");
+      showAlert("Error", err.message || "Failed to update status.", "error");
     }
+  };
+
+  const handleSuccessClose = () => {
+    setSuccessModalVisible(false);
+    navigation.navigate("TechnicianHome");
   };
 
   if (isLoading) {
@@ -101,101 +148,87 @@ export const ReachLocationScreen = () => {
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <AppHeader
         title="Mark as Reached"
-        subtitle={ticketNo}
+        subtitle="Mark arrival at customer location"
         showBack
         onBackPress={() => navigation.goBack()}
       />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Map Pin Visual */}
-        <View
-          style={[
-            styles.mapPinContainer,
-            { backgroundColor: `${theme.colors.primary}08` },
-          ]}
-        >
-          <View
-            style={[styles.mapPinCircle, { backgroundColor: `${theme.colors.primary}18` }]}
-          >
-            <View
-              style={[styles.mapPinInner, { backgroundColor: `${theme.colors.primary}30` }]}
-            >
-              <MapPin size={42} color={theme.colors.primary} />
-            </View>
-          </View>
-          <Text style={[styles.mapPinTitle, { color: theme.colors.text }]}>
-            Confirm Your Arrival
-          </Text>
-          <Text style={[styles.mapPinSubtitle, { color: theme.colors.textMuted }]}>
-            GPS coordinates will be captured and logged as your arrival proof
-          </Text>
-        </View>
-
-        {/* GPS Status Card */}
         <AppCard style={styles.card}>
-          <View style={styles.gpsRow}>
-            <Navigation size={18} color={theme.colors.primary} />
-            <Text style={[styles.gpsLabel, { color: theme.colors.text }]}>GPS Status</Text>
+          {/* Ticket Number Field */}
+          <View style={styles.fieldWrapper}>
+            <View style={styles.rowLayout}>
+              <View style={[styles.iconContainer, { backgroundColor: `${theme.colors.primary}12` }]}>
+                <Tag size={20} color={theme.colors.primary} />
+              </View>
+              <View style={styles.textContainer}>
+                <Text style={[styles.fieldLabel, { color: theme.colors.textMuted }]}>Ticket Number</Text>
+                <Text style={[styles.fieldValueText, { color: theme.colors.text }]}>{ticketNo}</Text>
+              </View>
+              <View style={styles.statusBadge}>
+                <CheckCircle2 size={18} color={theme.colors.success} />
+              </View>
+            </View>
           </View>
 
-          {gpsLoading ? (
-            <View style={styles.gpsCapturing}>
-              <AppLoader message="Acquiring GPS signal..." />
-            </View>
-          ) : gpsError ? (
-            <View style={[styles.gpsErrorBox, { backgroundColor: `${theme.colors.warning}10` }]}>
-              <Text style={[styles.gpsErrorText, { color: theme.colors.warning }]}>{gpsError}</Text>
-              {gpsCoords && (
-                <Text style={[styles.coordsText, { color: theme.colors.text }]}>
-                  Fallback: {gpsCoords.lat}, {gpsCoords.lng}
-                </Text>
-              )}
-              <AppButton
-                title="Retry GPS"
-                onPress={fetchGPS}
-                variant="outline"
-                size="sm"
-                style={{ marginTop: 10 }}
-              />
-            </View>
-          ) : gpsCoords ? (
-            <View
-              style={[
-                styles.gpsSuccessBox,
-                { backgroundColor: `${theme.colors.success}10`, borderColor: theme.colors.success },
-              ]}
-            >
-              <View style={styles.coordRow}>
-                <CheckCircle2 size={16} color={theme.colors.success} />
-                <Text style={[styles.coordsText, { color: theme.colors.text }]}>
-                  Latitude: <Text style={{ fontWeight: "700" }}>{gpsCoords.lat}</Text>
+          <View style={[styles.divider, { backgroundColor: theme.colors.borderLight }]} />
+
+          {/* Reach Time Field */}
+          <View style={styles.fieldWrapper}>
+            <View style={styles.rowLayout}>
+              <View style={[styles.iconContainer, { backgroundColor: `${theme.colors.purple}12` }]}>
+                <Clock size={20} color={theme.colors.purple} />
+              </View>
+              <View style={styles.textContainer}>
+                <Text style={[styles.fieldLabel, { color: theme.colors.textMuted }]}>Reach Time</Text>
+                <Text style={[styles.fieldValueText, { color: theme.colors.text }]}>
+                  {timestamp || "Acquiring time..."}
                 </Text>
               </View>
-              <View style={styles.coordRow}>
-                <CheckCircle2 size={16} color={theme.colors.success} />
-                <Text style={[styles.coordsText, { color: theme.colors.text }]}>
-                  Longitude: <Text style={{ fontWeight: "700" }}>{gpsCoords.lng}</Text>
-                </Text>
-              </View>
-              {timestamp && (
-                <View style={styles.coordRow}>
-                  <Clock size={16} color={theme.colors.success} />
-                  <Text style={[styles.coordsText, { color: theme.colors.text }]}>
-                    Captured at: <Text style={{ fontWeight: "700" }}>{timestamp}</Text>
-                  </Text>
+              {timestamp ? (
+                <View style={styles.statusBadge}>
+                  <CheckCircle2 size={18} color={theme.colors.success} />
+                </View>
+              ) : (
+                <View style={styles.statusBadge}>
+                  <Clock size={18} color={theme.colors.warning} />
                 </View>
               )}
             </View>
-          ) : null}
-        </AppCard>
+          </View>
 
-        {/* Destination Card */}
-        <Text style={[styles.sectionLabel, { color: theme.colors.textMuted }]}>Destination</Text>
-        <AppCard style={styles.card}>
-          <Text style={[styles.serviceName, { color: theme.colors.text }]}>{job?.service}</Text>
-          <View style={styles.addrRow}>
-            <MapPin size={14} color={theme.colors.textMuted} />
-            <Text style={[styles.addrText, { color: theme.colors.textMuted }]}>{job?.address}</Text>
+          <View style={[styles.divider, { backgroundColor: theme.colors.borderLight }]} />
+
+          {/* GPS Location Field */}
+          <View style={styles.fieldWrapper}>
+            <View style={styles.rowLayout}>
+              <View style={[styles.iconContainer, { backgroundColor: `${theme.colors.success}12` }]}>
+                <MapPin size={20} color={theme.colors.success} />
+              </View>
+              <View style={styles.textContainer}>
+                <Text style={[styles.fieldLabel, { color: theme.colors.textMuted }]}>GPS Location</Text>
+                {gpsLoading ? (
+                  <Text style={[styles.fieldValueText, { color: theme.colors.textMuted }]}>Acquiring location address...</Text>
+                ) : gpsError ? (
+                  <Text style={[styles.fieldValueText, { color: theme.colors.warning }]}>{gpsError}</Text>
+                ) : locationName ? (
+                  <Text style={[styles.fieldValueText, { color: theme.colors.text }]}>
+                    {locationName}
+                  </Text>
+                ) : (
+                  <Text style={[styles.fieldValueText, { color: theme.colors.textMuted }]}>Waiting for GPS...</Text>
+                )}
+              </View>
+              {locationName ? (
+                <View style={styles.statusBadge}>
+                  <CheckCircle2 size={18} color={theme.colors.success} />
+                </View>
+              ) : (
+                <View style={styles.statusBadge}>
+                  <Clock size={18} color={theme.colors.warning} />
+                </View>
+              )}
+            </View>
           </View>
         </AppCard>
 
@@ -208,7 +241,7 @@ export const ReachLocationScreen = () => {
             disabled={gpsLoading || !gpsCoords}
             variant="primary"
             size="lg"
-            icon={<MapPin size={20} color="#ffffff" />}
+            icon={<ShieldCheck size={20} color="#ffffff" />}
           />
           <AppButton
             title="Go Back"
@@ -218,6 +251,24 @@ export const ReachLocationScreen = () => {
           />
         </View>
       </ScrollView>
+
+      {/* App Success Modal */}
+      <AppSuccessModal
+        visible={successModalVisible}
+        title="Marked as Reached ✓"
+        message={`Location recorded at ${timestamp}.\nAddress: ${locationName || (gpsCoords ? `${gpsCoords.lat}, ${gpsCoords.lng}` : "")}`}
+        onClose={handleSuccessClose}
+        autoCloseDelay={3000}
+      />
+
+      {/* Custom Alert/Warning Modal */}
+      <AppAlertModal
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        type={alertType}
+        onClose={() => setAlertVisible(false)}
+      />
     </View>
   );
 };
@@ -225,52 +276,46 @@ export const ReachLocationScreen = () => {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: 16, paddingBottom: 40 },
-  mapPinContainer: {
-    alignItems: "center",
-    paddingVertical: 32,
-    borderRadius: 16,
-    marginBottom: 20,
+  card: { padding: 16, marginBottom: 16 },
+  fieldWrapper: {
+    paddingVertical: 4,
   },
-  mapPinCircle: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+  rowLayout: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  iconContainer: {
+    width: 42,
+    height: 42,
+    borderRadius: 10,
+    alignItems: "center",
     justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 16,
+    marginRight: 14,
   },
-  mapPinInner: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    justifyContent: "center",
-    alignItems: "center",
+  textContainer: {
+    flex: 1,
   },
-  mapPinTitle: { fontSize: 18, fontWeight: "800", marginBottom: 6 },
-  mapPinSubtitle: { fontSize: 13, textAlign: "center", paddingHorizontal: 20, lineHeight: 20 },
-  card: { marginBottom: 16 },
-  gpsRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 },
-  gpsLabel: { fontSize: 14, fontWeight: "700" },
-  gpsCapturing: { paddingVertical: 8 },
-  gpsErrorBox: { padding: 12, borderRadius: 8 },
-  gpsErrorText: { fontSize: 13, fontWeight: "600", marginBottom: 4 },
-  gpsSuccessBox: {
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 6,
-  },
-  coordRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  coordsText: { fontSize: 13 },
-  sectionLabel: {
-    fontSize: 11,
+  fieldLabel: {
+    fontSize: 10,
     fontWeight: "700",
     textTransform: "uppercase",
-    letterSpacing: 0.7,
-    marginBottom: 8,
+    marginBottom: 4,
+    letterSpacing: 0.5,
   },
-  serviceName: { fontSize: 15, fontWeight: "600", marginBottom: 8 },
-  addrRow: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
-  addrText: { fontSize: 13, flex: 1 },
-  actions: { gap: 10 },
+  fieldValueText: {
+    fontSize: 14,
+    fontWeight: "700",
+    lineHeight: 20,
+  },
+  statusBadge: {
+    paddingLeft: 8,
+  },
+  divider: {
+    height: 1,
+    marginVertical: 12,
+  },
+  actions: {
+    gap: 10,
+    marginTop: 8,
+  },
 });

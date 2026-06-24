@@ -96,6 +96,8 @@ export const TicketCard: React.FC<TicketCardProps> = ({ ticket, onPress, style }
     ? "Start Job"
     : ticket.status === "IN_PROGRESS"
     ? "Update Status"
+    : ((ticket.status as string) === "INVOICE_GENERATED" || (ticket.status as string) === "CLOSED")
+    ? "View Invoice Details"
     : "View Details";
 
   return (

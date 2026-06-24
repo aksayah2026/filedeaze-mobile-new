@@ -40,6 +40,7 @@ export const CustomerSignatureScreen = () => {
   const currentStroke = useRef<Stroke>([]);
   const [remarks, setRemarks] = useState("");
   const [hasSigned, setHasSigned] = useState(false);
+  const [scrollEnabled, setScrollEnabled] = useState(true);
 
   // PanResponder for signature capture
   const panResponder = useRef(
@@ -48,9 +49,11 @@ export const CustomerSignatureScreen = () => {
       onMoveShouldSetPanResponder: () => true,
 
       onPanResponderGrant: (evt) => {
+        setScrollEnabled(false);
         const { locationX, locationY } = evt.nativeEvent;
         currentStroke.current = [{ x: locationX, y: locationY }];
         setHasSigned(true);
+        setStrokes((prev) => [...prev, [{ x: locationX, y: locationY }]]);
       },
 
       onPanResponderMove: (evt) => {
@@ -58,17 +61,27 @@ export const CustomerSignatureScreen = () => {
         currentStroke.current = [...currentStroke.current, { x: locationX, y: locationY }];
         // Force re-render by pushing current (will finish on release)
         setStrokes((prev) => {
+          if (prev.length === 0) return [[...currentStroke.current]];
           const copy = [...prev];
-          copy[copy.length] = [...currentStroke.current];
+          copy[copy.length - 1] = [...currentStroke.current];
           return copy;
         });
       },
 
       onPanResponderRelease: () => {
         if (currentStroke.current.length > 0) {
-          setStrokes((prev) => [...prev, [...currentStroke.current]]);
-          currentStroke.current = [];
+          setStrokes((prev) => {
+            const copy = [...prev];
+            copy[copy.length - 1] = [...currentStroke.current];
+            return copy;
+          });
         }
+        currentStroke.current = [];
+        setScrollEnabled(true);
+      },
+      onPanResponderTerminate: () => {
+        currentStroke.current = [];
+        setScrollEnabled(true);
       },
     })
   ).current;
@@ -110,7 +123,11 @@ export const CustomerSignatureScreen = () => {
         onBackPress={() => navigation.goBack()}
       />
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        scrollEnabled={scrollEnabled}
+      >
         {/* Step Indicator */}
         <View style={styles.stepIndicator}>
           {["Photos", "Signature", "Payment"].map((step, i) => (
@@ -124,8 +141,8 @@ export const CustomerSignatureScreen = () => {
                         i < 1
                           ? theme.colors.success
                           : i === 1
-                          ? theme.colors.primary
-                          : theme.colors.borderLight,
+                            ? theme.colors.primary
+                            : theme.colors.borderLight,
                     },
                   ]}
                 >
@@ -139,8 +156,8 @@ export const CustomerSignatureScreen = () => {
                         i === 1
                           ? theme.colors.primary
                           : i < 1
-                          ? theme.colors.success
-                          : theme.colors.textMuted,
+                            ? theme.colors.success
+                            : theme.colors.textMuted,
                     },
                   ]}
                 >

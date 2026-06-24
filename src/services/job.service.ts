@@ -46,9 +46,23 @@ export interface Ticket {
   pendingReason?: string;
   category?: string;
   subCategory?: string;
+  categoryPrice?: number;
+  serviceCharge?: number;
+  inspectionCharge?: number;
   images?: string[];
   statusLogs?: { status: string; changedAt: string }[];
   scheduledDateRaw?: string;
+  scheduledAt?: string;
+  invoiceNo?: string;
+  // Real invoice DB fields
+  invoiceSubtotal?: number;
+  invoiceGstAmount?: number;
+  invoiceGstPercent?: number;
+  invoiceTotal?: number;
+  invoiceGeneratedAt?: string;
+  gstEnabled?: boolean;
+  gstPercent?: number;
+  closedAt?: string;
 }
 
 export interface Invoice {
@@ -68,6 +82,7 @@ export interface AttendanceLog {
   workingHours?: string;
   shiftCompleted?: boolean;
   rawCheckInTime?: string;
+  completedTickets?: number;
 }
 
 export interface AttendanceRecord {
@@ -85,6 +100,7 @@ export function normalizeTicket(raw: any): Ticket {
 
   let scheduledDate = "—";
   let scheduledTime = "—";
+  let scheduledDateRaw: string | undefined = undefined;
   if (raw.scheduledAt) {
     const d = new Date(raw.scheduledAt);
     scheduledDate = d.toLocaleDateString("en-IN", {
@@ -99,6 +115,16 @@ export function normalizeTicket(raw: any): Ticket {
       hour12: true,
       timeZone: "Asia/Kolkata",
     });
+    try {
+      scheduledDateRaw = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Kolkata",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(d);
+    } catch {
+      scheduledDateRaw = raw.scheduledAt.substring(0, 10);
+    }
   }
 
   // Handle images if they exist in raw
@@ -128,9 +154,23 @@ export function normalizeTicket(raw: any): Ticket {
     pendingReason: raw.pendingReason ?? undefined,
     workNotes: raw.workNotes ?? undefined,
     duration: raw.duration ?? undefined,
-    paymentCollection: raw.paymentCollection ?? undefined,
-    paymentMethod: raw.paymentMethod ?? undefined,
-    scheduledDateRaw: raw.scheduledAt ? raw.scheduledAt.split("T")[0] : undefined,
+    paymentCollection: raw.payment?.amount ?? raw.paymentCollection ?? undefined,
+    paymentMethod: raw.payment?.method ?? raw.paymentMethod ?? undefined,
+    categoryPrice: raw.subCategory?.category?.price ? parseFloat(raw.subCategory?.category?.price) : undefined,
+    serviceCharge: raw.subCategory?.serviceCharges?.serviceCharge ? Number(raw.subCategory?.serviceCharges?.serviceCharge) : undefined,
+    inspectionCharge: raw.subCategory?.serviceCharges?.inspectionCharge ? Number(raw.subCategory?.serviceCharges?.inspectionCharge) : undefined,
+    scheduledDateRaw,
+    scheduledAt: raw.scheduledAt ?? undefined,
+    invoiceNo: raw.invoice?.invoiceNumber ?? raw.invoice?.invoiceNo ?? raw.invoiceNo ?? undefined,
+    // Real invoice DB fields — populated when invoice is included in the API response
+    invoiceSubtotal:    raw.invoice?.subtotal   != null ? Number(raw.invoice.subtotal)   : undefined,
+    invoiceGstAmount:   raw.invoice?.gstAmount  != null ? Number(raw.invoice.gstAmount)  : undefined,
+    invoiceGstPercent:  raw.invoice?.gstPercent != null ? Number(raw.invoice.gstPercent) : undefined,
+    invoiceTotal:       raw.invoice?.total      != null ? Number(raw.invoice.total)      : undefined,
+    invoiceGeneratedAt: raw.invoice?.generatedAt ? String(raw.invoice.generatedAt)       : undefined,
+    gstEnabled:         raw.gstEnabled ?? false,
+    gstPercent:         raw.gstPercent != null ? Number(raw.gstPercent) : 0,
+    closedAt:           raw.closedAt ? String(raw.closedAt) : undefined,
     images: images.map((img: any) => img.imageUrl),
     statusLogs: raw.statusLogs ?? [],
   };
@@ -158,6 +198,7 @@ function normalizeAttendanceLog(raw: any): AttendanceLog {
     checkInLocation: raw.checkInLocation ?? raw.checkInRemarks ?? raw.location ?? undefined,
     checkOutTime,
     workingHours: raw.workingHours ?? undefined,
+    completedTickets: raw.completedTickets ?? undefined,
   };
 }
 
@@ -244,6 +285,7 @@ export class JobService {
     if (month !== undefined) params.month = month;
     if (year !== undefined) params.year = year;
     const res = await apiClient.get<any>(`${BASE}/tickets`, { params });
+    console.log("getTechnicianJobs response:", JSON.stringify(res.data, null, 2));
     const rawList = Array.isArray(res.data) ? res.data : res.data?.data ?? [];
     return rawList.map(normalizeTicket);
   }
@@ -253,11 +295,14 @@ export class JobService {
    */
   static async getJobDetails(ticketNo: string): Promise<Ticket | null> {
     try {
+      console.log("getJobDetails calling ticketNo:", ticketNo);
       const res = await apiClient.get<any>(`${BASE}/tickets/${ticketNo}`);
+      console.log("getJobDetails response data:", JSON.stringify(res.data, null, 2));
       const rawData = res.data && res.data.data ? res.data.data : res.data;
       if (!rawData) return null;
       return normalizeTicket(rawData);
-    } catch {
+    } catch (e: any) {
+      console.error("getJobDetails error:", e.message || e);
       return null;
     }
   }
@@ -302,17 +347,19 @@ export class JobService {
     const ext = filename.split(".").pop()?.toLowerCase() ?? "jpg";
     const mimeType = ext === "png" ? "image/png" : "image/jpeg";
 
-    formData.append("image", {
+    formData.append("file", {
       uri: imageUri,
       name: filename,
       type: mimeType,
     } as any);
-    formData.append("type", type);
 
     const res = await apiClient.post<{ url: string }>(
       `${BASE}/tickets/${ticketNo}/images`,
       formData,
-      { headers: { "Content-Type": "multipart/form-data" } }
+      {
+        params: { type },
+        headers: { "Content-Type": "multipart/form-data" }
+      }
     );
     return res.data;
   }
@@ -411,6 +458,7 @@ export class JobService {
         isCheckedIn: boolean;
         checkInTime: string | null;
         checkOutTime: string | null;
+        completedTickets?: number;
       };
     }>("/mobile/technician/dashboard");
 
@@ -450,6 +498,7 @@ export class JobService {
       shiftCompleted: hasCheckedIn && hasCheckedOut,
       rawCheckInTime: dashboard.checkInTime ?? undefined,
       workingHours,
+      completedTickets: dashboard.completedTickets ?? undefined,
     };
   }
 
@@ -535,6 +584,17 @@ export class JobService {
       params: { mobile },
     });
     return res.data?.data || [];
+  }
+
+  /**
+   * GET /mobile/technician/invoices
+   */
+  static async getTechnicianInvoices(month?: number, year?: number): Promise<any[]> {
+    const params: any = {};
+    if (month !== undefined) params.month = month;
+    if (year !== undefined) params.year = year;
+    const res = await apiClient.get<any>("/mobile/technician/invoices", { params });
+    return res.data?.data || res.data || [];
   }
 }
 

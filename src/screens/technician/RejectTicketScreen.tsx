@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   TextInput,
+  Pressable,
 } from "react-native";
 import { useRoute, useNavigation, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -15,7 +16,7 @@ import { XCircle, AlertTriangle } from "lucide-react-native";
 
 import { useTheme } from "../../theme";
 import { TechnicianStackParamList } from "../../types/navigation.types";
-import { useRejectJob, useJobDetails } from "../../hooks/useJobs";
+import { useRejectJob, useJobDetails, useAttendanceStatus } from "../../hooks/useJobs";
 import { AppHeader } from "../../components/AppHeader";
 import { AppCard } from "../../components/AppCard";
 import { AppButton } from "../../components/AppButton";
@@ -41,6 +42,8 @@ export const RejectTicketScreen = () => {
   const { jobId, ticketNo } = route.params;
 
   const { data: job, isLoading } = useJobDetails(jobId);
+  const { data: attendance } = useAttendanceStatus();
+  const isCheckedIn = !!attendance?.checkedIn;
   const rejectMutation = useRejectJob();
 
   const [reason, setReason] = useState("");
@@ -92,6 +95,23 @@ export const RejectTicketScreen = () => {
       />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {!isCheckedIn && (
+          <Pressable
+            onPress={() => navigation.navigate("TechnicianHome")}
+            style={[
+              styles.warningBanner,
+              { backgroundColor: `${theme.colors.danger}08`, borderColor: theme.colors.danger, marginBottom: 12, flexDirection: "row", alignItems: "center" },
+            ]}
+          >
+            <AlertTriangle size={18} color={theme.colors.danger} />
+            <View style={{ flex: 1, marginLeft: 8 }}>
+              <Text style={{ fontSize: 12, color: theme.colors.danger, fontWeight: "600", lineHeight: 16 }}>
+                Login to reject this job.
+              </Text>
+            </View>
+          </Pressable>
+        )}
+
         {/* Warning Banner */}
         <View
           style={[
@@ -186,7 +206,7 @@ export const RejectTicketScreen = () => {
             title="Reject Job"
             onPress={handleReject}
             loading={rejectMutation.isPending}
-            disabled={reason.trim().length < 10}
+            disabled={reason.trim().length < 10 || !isCheckedIn}
             variant="danger"
             size="lg"
             icon={<XCircle size={20} color="#ffffff" />}

@@ -147,8 +147,9 @@ export interface CustomerFeedback {
 export interface CustomerInvoice {
   id: string;
   invoiceNumber: string;
-  amount: number;
-  gst: number;
+  subtotal: number;
+  gstPercent: number;
+  gstAmount: number;
   total: number;
   generatedAt: string;
   pdfUrl: string | null;
@@ -162,6 +163,10 @@ export interface CustomerInvoice {
         name: string;
       };
     };
+    technician?: {
+      name: string;
+      phone: string;
+    } | null;
   };
   payment: {
     method: string;
@@ -244,10 +249,10 @@ export const CustomerService = {
     apiClient.get("/mobile/customer/addresses").then((r) => r.data.data),
 
   getCategories: (): Promise<any[]> =>
-    apiClient.get("/web/manager/service-categories").then((r) => r.data.data),
+    apiClient.get("/categories").then((r) => r.data.data),
 
   getCategoryDetails: (id: string): Promise<any> =>
-    apiClient.get(`/web/manager/service-sub-categories?categoryId=${id}`).then((r) => r.data.data),
+    apiClient.get(`/mobile/customer/catalog/categories/${id}`).then((r) => r.data.data),
 
   addAddress: (payload: { label: string; addressText: string; lat: number; lng: number }): Promise<Address> =>
     apiClient.post("/mobile/customer/addresses", payload).then((r) => r.data.data),

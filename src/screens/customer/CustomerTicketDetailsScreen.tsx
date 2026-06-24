@@ -11,6 +11,12 @@ import {
   X,
   Star,
   HelpCircle,
+  PlusCircle,
+  UserCheck,
+  Wrench,
+  CheckCircle2,
+  XCircle,
+  ShieldCheck,
 } from "lucide-react-native";
 
 import { useTheme } from "../../theme";
@@ -31,7 +37,7 @@ export const CustomerTicketDetailsScreen = () => {
   const navigation = useNavigation<NavigationProp>();
   const { ticketId } = route.params;
 
-  const { data: ticket, isLoading, refetch } = useCustomerTicketDetails(ticketId);
+  const { data: ticket, isLoading, refetch } = useCustomerTicketDetails(ticketId, { refetchInterval: 5000 });
   const cancelTicketMutation = useCancelCustomerTicket();
 
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
@@ -73,13 +79,17 @@ export const CustomerTicketDetailsScreen = () => {
         return { label: "ACCEPTED", variant: "warning" as const };
       case "TRAVELLING":
         return { label: "EN ROUTE", variant: "warning" as const };
+      case "REACHED":
       case "REACHED_LOCATION":
         return { label: "ARRIVED", variant: "warning" as const };
       case "IN_PROGRESS":
         return { label: "IN PROGRESS", variant: "warning" as const };
       case "COMPLETED":
         return { label: "COMPLETED", variant: "success" as const };
+      case "INVOICE_GENERATED":
+        return { label: "INVOICE GENERATED", variant: "success" as const };
       case "TICKET_CLOSED":
+      case "CLOSED":
         return { label: "CLOSED", variant: "success" as const };
       case "CANCELLED":
         return { label: "CANCELLED", variant: "danger" as const };
@@ -90,10 +100,39 @@ export const CustomerTicketDetailsScreen = () => {
 
   const badgeProps = getStatusBadgeProps(ticket.status);
 
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "NEW_TICKET":
+        return PlusCircle;
+      case "ASSIGNED":
+      case "ACCEPTED":
+        return UserCheck;
+      case "TRAVELLING":
+      case "REACHED":
+      case "REACHED_LOCATION":
+        return MapPin;
+      case "IN_PROGRESS":
+        return Wrench;
+      case "COMPLETED":
+      case "INVOICE_GENERATED":
+      case "TICKET_CLOSED":
+      case "CLOSED":
+        return CheckCircle2;
+      case "CANCELLED":
+        return XCircle;
+      default:
+        return HelpCircle;
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    return theme.colors.primary;
+  };
+
   // Conditions
   const isCancellable = ["NEW_TICKET", "ASSIGNED", "ACCEPTED"].includes(ticket.status);
-  const isTrackable = ["TRAVELLING", "REACHED_LOCATION", "IN_PROGRESS"].includes(ticket.status);
-  const isClosed = ["COMPLETED", "TICKET_CLOSED"].includes(ticket.status);
+  const isTrackable = ["TRAVELLING", "REACHED_LOCATION", "IN_PROGRESS", "COMPLETED", "INVOICE_GENERATED", "TICKET_CLOSED", "CLOSED"].includes(ticket.status);
+  const isClosed = ["COMPLETED", "INVOICE_GENERATED", "TICKET_CLOSED", "CLOSED"].includes(ticket.status);
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return "—";
@@ -267,24 +306,28 @@ export const CustomerTicketDetailsScreen = () => {
             ticket.statusLogs.map((log, index) => {
               const isLast = index === ticket.statusLogs.length - 1;
               const subProps = getStatusBadgeProps(log.status);
+              const StatusIcon = getStatusIcon(log.status);
+              const statusColor = getStatusColor(log.status);
 
               return (
                 <View key={log.id} style={styles.timelineItem}>
                   <View style={styles.timelineIndicator}>
                     <View style={[
-                      styles.timelineDot,
+                      styles.timelineDotContainer,
                       {
-                        backgroundColor: isLast ? theme.colors.primary : "#ffffff",
-                        borderColor: isLast ? `${theme.colors.primary}40` : theme.colors.borderLight,
-                        borderWidth: isLast ? 4 : 2,
+                        backgroundColor: `${theme.colors.primary}12`,
+                        borderColor: isLast ? theme.colors.primary : `${theme.colors.primary}40`,
+                        borderWidth: isLast ? 2 : 1.5,
                       }
-                    ]} />
-                    {!isLast && <View style={[styles.timelineLine, { backgroundColor: theme.colors.borderLight }]} />}
+                    ]}>
+                      <StatusIcon size={12} color={theme.colors.primary} />
+                    </View>
+                    {!isLast && <View style={[styles.timelineLine, { backgroundColor: theme.colors.primary }]} />}
                   </View>
 
                   <View style={styles.timelineContent}>
                     <View style={styles.timelineHeader}>
-                      <Text style={[styles.timelineStatusText, { color: isLast ? theme.colors.primary : theme.colors.text, fontWeight: isLast ? "700" : "600" }]}>
+                      <Text style={[styles.timelineStatusText, { color: theme.colors.primary, fontWeight: "700" }]}>
                         {subProps.label}
                       </Text>
                       <View style={styles.timeWrapper}>
@@ -318,7 +361,11 @@ export const CustomerTicketDetailsScreen = () => {
           {isTrackable && (
             <AppButton
               title="Track Live"
-              onPress={() => navigation.navigate("LiveTracking", { ticketId: ticket.id, ticketNumber: ticket.ticketNumber })}
+              onPress={() => navigation.navigate("LiveTracking", {
+                ticketId: ticket.id,
+                ticketNumber: ticket.ticketNumber,
+                hasFeedback: !!ticket.feedback,
+              })}
               style={{ marginBottom: 10 }}
             />
           )}
@@ -505,10 +552,12 @@ const styles = StyleSheet.create({
     width: 28,
     alignItems: "center",
   },
-  timelineDot: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
+  timelineDotContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
     marginTop: 4,
     zIndex: 2,
   },

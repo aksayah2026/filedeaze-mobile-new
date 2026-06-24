@@ -27,16 +27,13 @@ import {
   FileCheck,
   Timer,
   Calendar,
+  Receipt,
 } from "lucide-react-native";
 
 import { useTheme } from "../../theme";
 import { useAuthStore } from "../../store/auth.store";
-import {
-  useTechnicianJobs,
-  useAttendanceStatus,
-  useCheckIn,
-  useCheckOut,
-} from "../../hooks/useJobs";
+import { useTechnicianJobs, useTechnicianInvoices, useAttendanceStatus, useCheckIn, useCheckOut } from "../../hooks/useJobs";
+import { TicketStatus } from "../../services/job.service";
 import { TechnicianStackParamList } from "../../types/navigation.types";
 import { AppHeader } from "../../components/AppHeader";
 import { AppLoader } from "../../components/AppLoader";
@@ -59,6 +56,7 @@ export const TechnicianHomeScreen = () => {
   const navigation = useNavigation<NavigationProp>();
   const { user, logout } = useAuthStore();
   const { data: jobs = [], isLoading: isJobsLoading, isError, error, refetch, isRefetching } = useTechnicianJobs();
+  const { data: invoices = [], isLoading: isInvoicesLoading, refetch: refetchInvoices, isRefetching: isRefetchingInvoices } = useTechnicianInvoices();
   const { data: attendance, isLoading: isAttendanceLoading } = useAttendanceStatus();
 
   const checkInMutation = useCheckIn();
@@ -151,12 +149,25 @@ export const TechnicianHomeScreen = () => {
     (j) => (j.status as string) === "INVOICE_GENERATED"
   );
 
-  // 3. Completed/Closed today
-  const completedToday = jobsList.filter(
-    (j) =>
-      ["COMPLETED", "CLOSED"].includes(j.status) &&
-      j.scheduledDateRaw === todayStr
-  );
+  // 3. Completed/Closed
+  const completedTickets = (invoices || []).map((inv: any) => ({
+    id: inv.ticketId,
+    ticketNo: inv.ticket?.ticketNumber || inv.invoiceNumber,
+    service: `Invoice: #${inv.invoiceNumber}`,
+    status: "CLOSED" as TicketStatus,
+    customerName: inv.ticket?.customer?.name || "Client",
+    customerMobile: "",
+    description: `Payment Mode: ${inv.payment?.method || "N/A"}\nTotal Collected: ₹${inv.total}`,
+    scheduledDate: inv.generatedAt 
+      ? new Date(inv.generatedAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" })
+      : "—",
+    scheduledTime: inv.generatedAt
+      ? new Date(inv.generatedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" })
+      : "",
+    address: "—",
+    paymentCollection: Number(inv.total),
+    paymentMethod: inv.payment?.method,
+  }));
 
   // 4. Upcoming tickets: scheduled in the future
   const upcoming = jobsList.filter(
@@ -165,13 +176,17 @@ export const TechnicianHomeScreen = () => {
       (j.status as string) !== "CANCELLED"
   );
 
-  const activeTickets = [...ongoing, ...paymentPending, ...completedToday, ...upcoming];
+  const activeTickets = Array.from(
+    new Map(
+      [...ongoing, ...paymentPending, ...completedTickets, ...upcoming].map((item) => [item.id, item])
+    ).values()
+  );
   const assignedCount = jobsList.filter((j) => j.status === "ASSIGNED" || j.status === "NEW").length;
   const inProgressCount = jobsList.filter(
-    (j) => j.status === "IN_PROGRESS" || j.status === "ACCEPTED" || j.status === "TRAVELLING" || j.status === "REACHED" || j.status === "COMPLETED"
+    (j) => j.status === "IN_PROGRESS" || j.status === "ACCEPTED" || j.status === "TRAVELLING" || j.status === "REACHED"
   ).length;
   const pendingCount = jobsList.filter((j) => j.status === "PENDING" || j.status === "RESCHEDULED").length;
-  const completedCount = jobsList.filter((j) => j.status === "CLOSED").length;
+  const completedCount = invoices.length;
   const completionRate = jobsList.length > 0 ? Math.round((completedCount / jobsList.length) * 100) : 0;
 
   const handleCheckInPress = () => {
@@ -348,8 +363,11 @@ export const TechnicianHomeScreen = () => {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={isJobsLoading || isRefetching}
-            onRefresh={refetch}
+            refreshing={isJobsLoading || isRefetching || isRefetchingInvoices}
+            onRefresh={() => {
+              refetch();
+              refetchInvoices();
+            }}
             colors={[theme.colors.primary]}
             tintColor={theme.colors.primary}
           />
@@ -499,7 +517,27 @@ export const TechnicianHomeScreen = () => {
         </AppCard>
 
         {/* Job Overview */}
-        <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>Job Overview</Text>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 16, marginBottom: 8 }}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.textMuted, marginTop: 0, marginBottom: 0 }]}>Job Overview</Text>
+          <Pressable
+            onPress={() => navigation.navigate("TechnicianInvoiceList")}
+            style={({ pressed }) => [
+              {
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 4,
+                paddingVertical: 4,
+                paddingHorizontal: 8,
+                borderRadius: 6,
+                backgroundColor: `${theme.colors.success}10`,
+              },
+              pressed && { opacity: 0.7 },
+            ]}
+          >
+            <Receipt size={16} color={theme.colors.success} />
+            <Text style={{ fontSize: 12, fontWeight: "600", color: theme.colors.success }}>Invoices</Text>
+          </Pressable>
+        </View>
         
         <View style={styles.statsGrid}>
           <View style={styles.statsRow}>

@@ -146,12 +146,15 @@ export const CustomerHomeScreen = () => {
   const getStatusVariant = (status: string) => {
     switch (status) {
       case "COMPLETED":
+      case "INVOICE_GENERATED":
       case "TICKET_CLOSED":
+      case "CLOSED":
         return "success";
       case "IN_PROGRESS":
       case "ASSIGNED":
       case "ACCEPTED":
       case "TRAVELLING":
+      case "REACHED":
       case "REACHED_LOCATION":
         return "warning";
       case "CANCELLED":
@@ -165,11 +168,13 @@ export const CustomerHomeScreen = () => {
     switch (status) {
       case "NEW_TICKET":
         return "NEW";
+      case "REACHED":
       case "REACHED_LOCATION":
         return "ARRIVED";
       case "TRAVELLING":
         return "EN ROUTE";
       case "TICKET_CLOSED":
+      case "CLOSED":
         return "CLOSED";
       default:
         return status.replace("_", " ");
@@ -531,11 +536,13 @@ export const CustomerHomeScreen = () => {
                   <View style={styles.invoiceBreakdown}>
                     <View style={styles.breakdownRow}>
                       <Text style={{ color: theme.colors.textMuted, fontSize: 13 }}>Base Amount:</Text>
-                      <Text style={{ color: theme.colors.text, fontSize: 13 }}>₹{inv.amount}</Text>
+                      <Text style={{ color: theme.colors.text, fontSize: 13 }}>₹{inv.subtotal}</Text>
                     </View>
                     <View style={styles.breakdownRow}>
-                      <Text style={{ color: theme.colors.textMuted, fontSize: 13 }}>GST (18%):</Text>
-                      <Text style={{ color: theme.colors.text, fontSize: 13 }}>₹{inv.gst}</Text>
+                      <Text style={{ color: theme.colors.textMuted, fontSize: 13 }}>
+                        {inv.gstPercent > 0 ? `GST (${inv.gstPercent}%):` : 'GST:'}
+                      </Text>
+                      <Text style={{ color: theme.colors.text, fontSize: 13 }}>₹{inv.gstAmount}</Text>
                     </View>
                     <View style={[styles.divider, { backgroundColor: theme.colors.borderLight }]} />
                     <View style={styles.breakdownRow}>

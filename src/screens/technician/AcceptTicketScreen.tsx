@@ -6,6 +6,8 @@ import {
   ScrollView,
   Alert,
   Image,
+  Pressable,
+  Linking,
 } from "react-native";
 import { useRoute, useNavigation, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -22,11 +24,12 @@ import {
   MapPin,
   PhoneCall,
   Clock,
+  Play,
 } from "lucide-react-native";
 
 import { useTheme } from "../../theme";
 import { TechnicianStackParamList } from "../../types/navigation.types";
-import { useUpdateJobStatus, useJobDetails, useTechnicianJobs } from "../../hooks/useJobs";
+import { useUpdateJobStatus, useJobDetails, useTechnicianJobs, useAttendanceStatus } from "../../hooks/useJobs";
 import { AppHeader } from "../../components/AppHeader";
 import { AppCard } from "../../components/AppCard";
 import { AppBadge } from "../../components/AppBadge";
@@ -51,8 +54,15 @@ export const AcceptTicketScreen = () => {
   const [alertModalMessage, setAlertModalMessage] = useState("");
 
   const { data: job, isLoading } = useJobDetails(jobId);
+  const { data: attendance } = useAttendanceStatus();
+  const isCheckedIn = !!attendance?.checkedIn;
   const { data: allJobs = [] } = useTechnicianJobs();
   const acceptMutation = useUpdateJobStatus();
+
+  const isVideoUrl = (url: string) => {
+    const ext = url.split("?")[0].split(".").pop()?.toLowerCase();
+    return ["mp4", "mov", "avi", "webm", "mkv", "3gp"].includes(ext || "");
+  };
 
   const handleConfirmAccept = async () => {
     setAcceptModalVisible(false);
@@ -122,6 +132,23 @@ export const AcceptTicketScreen = () => {
       />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {!isCheckedIn && (
+          <Pressable
+            onPress={() => navigation.navigate("TechnicianHome")}
+            style={[
+              styles.infoBanner,
+              { backgroundColor: `${theme.colors.danger}08`, borderColor: theme.colors.danger, marginBottom: 12, flexDirection: "row", alignItems: "center" },
+            ]}
+          >
+            <AlertCircle size={18} color={theme.colors.danger} />
+            <View style={{ flex: 1, marginLeft: 8 }}>
+              <Text style={{ fontSize: 12, color: theme.colors.danger, fontWeight: "600", lineHeight: 16 }}>
+                Login to accept this job.
+              </Text>
+            </View>
+          </Pressable>
+        )}
+
         {/* Confirmation Banner */}
         <View
           style={[
@@ -258,18 +285,47 @@ export const AcceptTicketScreen = () => {
           </View>
         </AppCard>
 
-        {/* Customer Attached Images */}
+        {/* Customer Attached Media */}
         {job?.images && job.images.length > 0 && (
           <>
-            <Text style={[styles.sectionLabel, { color: theme.colors.textMuted }]}>Attached Images</Text>
+            <Text style={[styles.sectionLabel, { color: theme.colors.textMuted }]}>Attached Media</Text>
             <View style={styles.imageGrid}>
-              {job.images.map((imgUrl, index) => (
-                <Image
-                  key={index}
-                  source={{ uri: imgUrl }}
-                  style={styles.attachedImage}
-                />
-              ))}
+              {job.images.map((imgUrl, index) => {
+                const isVideo = isVideoUrl(imgUrl);
+                if (isVideo) {
+                  return (
+                    <Pressable
+                      key={index}
+                      onPress={() => Linking.openURL(imgUrl)}
+                      style={[styles.attachedImage, {
+                        backgroundColor: "#0f172a",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        borderWidth: 1,
+                        borderColor: theme.colors.borderLight,
+                      }]}
+                    >
+                      <Play size={24} color="#ffffff" fill="#ffffff" />
+                      <Text style={{ fontSize: 9, color: "#ffffff", fontWeight: "700", marginTop: 4 }}>Play Video</Text>
+                    </Pressable>
+                  );
+                }
+                return (
+                  <Pressable
+                    key={index}
+                    onPress={() => Linking.openURL(imgUrl)}
+                    style={({ pressed }) => [
+                      styles.attachedImage,
+                      pressed && { opacity: 0.8 },
+                    ]}
+                  >
+                    <Image
+                      source={{ uri: imgUrl }}
+                      style={{ width: "100%", height: "100%", borderRadius: 8 }}
+                    />
+                  </Pressable>
+                );
+              })}
             </View>
           </>
         )}
@@ -281,6 +337,7 @@ export const AcceptTicketScreen = () => {
           <AppButton
             title="Reject Job"
             onPress={() => navigation.navigate("RejectTicket", { jobId, ticketNo })}
+            disabled={!isCheckedIn}
             variant="danger"
             size="lg"
             icon={<XCircle size={18} color="#ffffff" />}
@@ -289,6 +346,7 @@ export const AcceptTicketScreen = () => {
           <AppButton
             title="Accept Job"
             onPress={() => setAcceptModalVisible(true)}
+            disabled={!isCheckedIn}
             loading={acceptMutation.isPending}
             variant="success"
             size="lg"

@@ -1,3 +1,4 @@
+// Refreshed to clear IDE diagnostics
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -35,6 +36,8 @@ import {
   ArrowLeft,
   ChevronDown,
   Smartphone,
+  Play,
+  Receipt,
 } from "lucide-react-native";
 import QRCode from "react-native-qrcode-svg";
 import * as Location from "expo-location";
@@ -53,6 +56,7 @@ import {
   useCollectPayment,
   useUploadTicketImage,
   useTechnicianJobs,
+  useAttendanceStatus,
 } from "../../hooks/useJobs";
 import { AppHeader } from "../../components/AppHeader";
 import { AppLoader } from "../../components/AppLoader";
@@ -88,6 +92,7 @@ export const TechnicianJobDetailsScreen = () => {
   const { jobId } = route.params;
 
   const { data: job, isLoading, refetch } = useJobDetails(jobId);
+  const { data: attendance } = useAttendanceStatus();
   const { data: allJobs = [] } = useTechnicianJobs();
   const updateStatusMutation = useUpdateJobStatus();
   const completeJobMutation = useCompleteJob();
@@ -96,6 +101,12 @@ export const TechnicianJobDetailsScreen = () => {
   const rejectJobMutation = useRejectJob();
   const collectPaymentMutation = useCollectPayment();
   const uploadImageMutation = useUploadTicketImage();
+  const isCheckedIn = !!attendance?.checkedIn;
+
+  const isVideoUrl = (url: string) => {
+    const ext = url.split("?")[0].split(".").pop()?.toLowerCase();
+    return ["mp4", "mov", "avi", "webm", "mkv", "3gp"].includes(ext || "");
+  };
 
   // Dialog / Popups Visibility
   const [successVisible, setSuccessVisible] = useState(false);
@@ -112,6 +123,12 @@ export const TechnicianJobDetailsScreen = () => {
   const [alertModalVisible, setAlertModalVisible] = useState(false);
   const [alertModalTitle, setAlertModalTitle] = useState("");
   const [alertModalMessage, setAlertModalMessage] = useState("");
+
+  const showAlert = (title: string, message: string) => {
+    setAlertModalTitle(title);
+    setAlertModalMessage(message);
+    setAlertModalVisible(true);
+  };
 
   // Reject State
   const [rejectFormVisible, setRejectFormVisible] = useState(false);
@@ -271,7 +288,7 @@ export const TechnicianJobDetailsScreen = () => {
   const handleRejectSubmit = async () => {
     const finalReason = selectedRejectReason === "Other" ? rejectReasonText : selectedRejectReason;
     if (!finalReason.trim()) {
-      Alert.alert("Required", "Please select or describe a rejection reason.");
+      showAlert("Required", "Please select or describe a rejection reason.");
       return;
     }
     try {
@@ -282,13 +299,13 @@ export const TechnicianJobDetailsScreen = () => {
       setSuccessVisible(true);
       await refetch();
     } catch (err: any) {
-      Alert.alert("Error", err.message || "Failed to reject job.");
+      showAlert("Error", err.message || "Failed to reject job.");
     }
   };
 
   const handlePendingSubmit = async () => {
     if (!selectedPendingReason) {
-      Alert.alert("Required", "Please choose a pending reason.");
+      showAlert("Required", "Please choose a pending reason.");
       return;
     }
     try {
@@ -303,13 +320,13 @@ export const TechnicianJobDetailsScreen = () => {
       setSuccessVisible(true);
       await refetch();
     } catch (err: any) {
-      Alert.alert("Error", err.message || "Failed to save status.");
+      showAlert("Error", err.message || "Failed to save status.");
     }
   };
 
   const handleRescheduleSubmit = async () => {
     if (!nextVisitDate) {
-      Alert.alert("Required", "Please enter reschedule date.");
+      showAlert("Required", "Please enter reschedule date.");
       return;
     }
     try {
@@ -323,14 +340,14 @@ export const TechnicianJobDetailsScreen = () => {
       setSuccessVisible(true);
       await refetch();
     } catch (err: any) {
-      Alert.alert("Error", err.message || "Failed to reschedule.");
+      showAlert("Error", err.message || "Failed to reschedule.");
     }
   };
 
   const handlePhotoUpload = async (type: "BEFORE" | "AFTER") => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("Permission Needed", "Camera access is required.");
+      showAlert("Permission Needed", "Camera access is required.");
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
@@ -347,7 +364,7 @@ export const TechnicianJobDetailsScreen = () => {
         });
         await refetch();
       } catch (err: any) {
-        Alert.alert("Upload Error", err.message || "Failed to upload image.");
+        showAlert("Upload Error", err.message || "Failed to upload image.");
       } finally {
         setUploadingImage(false);
       }
@@ -357,7 +374,7 @@ export const TechnicianJobDetailsScreen = () => {
   const handleGalleryUpload = async (type: "BEFORE" | "AFTER") => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("Permission Needed", "Library access is required.");
+      showAlert("Permission Needed", "Library access is required.");
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -374,7 +391,7 @@ export const TechnicianJobDetailsScreen = () => {
         });
         await refetch();
       } catch (err: any) {
-        Alert.alert("Upload Error", err.message || "Failed to upload image.");
+        showAlert("Upload Error", err.message || "Failed to upload image.");
       } finally {
         setUploadingImage(false);
       }
@@ -383,7 +400,7 @@ export const TechnicianJobDetailsScreen = () => {
 
   const handleCompletionSubmit = async () => {
     if (!workNotes.trim()) {
-      Alert.alert("Required", "Please provide work summary notes.");
+      showAlert("Required", "Please provide work summary notes.");
       return;
     }
     try {
@@ -403,22 +420,22 @@ export const TechnicianJobDetailsScreen = () => {
       setSuccessVisible(true);
       await refetch();
     } catch (err: any) {
-      Alert.alert("Error", err.message || "Failed to complete ticket.");
+      showAlert("Error", err.message || "Failed to complete ticket.");
     }
   };
 
   const handlePaymentSubmit = async () => {
     const amt = parseFloat(paymentAmount);
     if (isNaN(amt) || amt <= 0) {
-      Alert.alert("Required", "Please enter a valid collection amount.");
+      showAlert("Required", "Please enter a valid collection amount.");
       return;
     }
     if (!paymentMethod) {
-      Alert.alert("Required", "Please select a payment method.");
+      showAlert("Required", "Please select a payment method.");
       return;
     }
     if (!paymentConfirmed) {
-      Alert.alert("Required", "Please confirm payment collection before submitting.");
+      showAlert("Required", "Please confirm payment collection before submitting.");
       return;
     }
     try {
@@ -433,7 +450,7 @@ export const TechnicianJobDetailsScreen = () => {
       setSuccessVisible(true);
       await refetch();
     } catch (err: any) {
-      Alert.alert("Error", err.message || "Failed to log payment.");
+      showAlert("Error", err.message || "Failed to log payment.");
     }
   };
 
@@ -649,92 +666,101 @@ export const TechnicianJobDetailsScreen = () => {
           )}
         </AppCard>
 
+        {/* Customer Attached Media */}
+        {job.images && job.images.length > 0 && job.status !== "COMPLETED" && job.status !== "CLOSED" && (
+          <>
+            <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>Attached Media</Text>
+            <View style={styles.photoGrid}>
+              {job.images.map((imgUrl, index) => {
+                const isVideo = isVideoUrl(imgUrl);
+                if (isVideo) {
+                  return (
+                    <Pressable
+                      key={index}
+                      onPress={() => Linking.openURL(imgUrl)}
+                      style={[styles.photoThumbnail, {
+                        backgroundColor: "#0f172a",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        borderWidth: 1,
+                        borderColor: theme.colors.borderLight,
+                      }]}
+                    >
+                      <Play size={24} color="#ffffff" fill="#ffffff" />
+                      <Text style={{ fontSize: 9, color: "#ffffff", fontWeight: "700", marginTop: 4 }}>Play Video</Text>
+                    </Pressable>
+                  );
+                }
+                return (
+                  <Pressable
+                    key={index}
+                    onPress={() => Linking.openURL(imgUrl)}
+                    style={({ pressed }) => [
+                      styles.photoThumbnail,
+                      pressed && { opacity: 0.8 },
+                    ]}
+                  >
+                    <Image
+                      source={{ uri: imgUrl }}
+                      style={{ width: "100%", height: "100%", borderRadius: 8 }}
+                    />
+                  </Pressable>
+                );
+              })}
+            </View>
+          </>
+        )}
+
         {/* Dynamic Action Controls */}
         <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>Execution Controls</Text>
 
         {/* 1. ASSIGNED / NEW */}
-        {(job.status === "ASSIGNED" || job.status === "NEW") && !rejectFormVisible && (
-          <AppCard style={styles.card}>
-            <Text style={[styles.actionCardTitle, { color: theme.colors.text }]}>Pending Acceptance</Text>
-            <Text style={{ fontSize: 13, color: theme.colors.textMuted, marginBottom: 16 }}>
-              Review customer details and accept this ticket to start the execution flow.
-            </Text>
-            <View style={styles.btnRow}>
-              <AppButton
-                title="Reject"
-                variant="outline"
-                onPress={() => setRejectFormVisible(true)}
-                style={{ flex: 1, borderColor: theme.colors.danger }}
-                textStyle={{ color: theme.colors.danger }}
-              />
-              <AppButton
-                title="Accept Ticket"
-                onPress={() =>
-                  triggerConfirm(
-                    "Accept Job",
-                    "Do you want to accept this job ticket?",
-                    "Accept",
-                    "success",
-                    () => handleStatusChange("ACCEPTED")
-                  )
-                }
-                style={{ flex: 1.5 }}
-              />
-            </View>
-          </AppCard>
-        )}
-
-        {/* Reject Form Inline */}
-        {rejectFormVisible && (
-          <AppCard style={styles.formCard}>
-            <Text style={[styles.formTitle, { color: theme.colors.text }]}>Rejection Reason</Text>
-            <View style={{ gap: 8, marginBottom: 16 }}>
-              {QUICK_REASONS.map((r) => {
-                const isSel = selectedRejectReason === r;
-                return (
-                  <Pressable
-                    key={r}
-                    onPress={() => {
-                      setSelectedRejectReason(r);
-                      setRejectReasonText("");
-                    }}
-                    style={[
-                      styles.reasonOption,
-                      {
-                        backgroundColor: isSel ? `${theme.colors.danger}10` : theme.colors.background,
-                        borderColor: isSel ? theme.colors.danger : theme.colors.borderLight,
-                      },
-                    ]}
-                  >
-                    <Text style={{ color: isSel ? theme.colors.danger : theme.colors.text }}>{r}</Text>
-                  </Pressable>
-                );
-              })}
-              <Pressable
-                onPress={() => setSelectedRejectReason("Other")}
-                style={[
-                  styles.reasonOption,
-                  {
-                    backgroundColor: selectedRejectReason === "Other" ? `${theme.colors.danger}10` : theme.colors.background,
-                    borderColor: selectedRejectReason === "Other" ? theme.colors.danger : theme.colors.borderLight,
-                  },
-                ]}
-              >
-                <Text style={{ color: selectedRejectReason === "Other" ? theme.colors.danger : theme.colors.text }}>Other Reason</Text>
-              </Pressable>
-            </View>
-            {selectedRejectReason === "Other" && (
-              <AppInput
-                placeholder="Describe rejection reason..."
-                value={rejectReasonText}
-                onChangeText={setRejectReasonText}
-              />
-            )}
-            <View style={styles.btnRow}>
-              <AppButton title="Cancel" variant="outline" onPress={() => setRejectFormVisible(false)} style={{ flex: 1 }} />
-              <AppButton title="Submit Reject" onPress={handleRejectSubmit} loading={rejectJobMutation.isPending} style={{ flex: 1.5 }} />
-            </View>
-          </AppCard>
+        {(job.status === "ASSIGNED" || job.status === "NEW") && (
+          !isCheckedIn ? (
+            <Pressable onPress={() => navigation.navigate("TechnicianHome")}>
+              <AppCard style={styles.card}>
+                <Text style={[styles.actionCardTitle, { color: theme.colors.text }]}>Pending Acceptance</Text>
+                <View style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  padding: 12,
+                  borderRadius: 8,
+                  backgroundColor: `${theme.colors.danger}08`,
+                  borderWidth: 1,
+                  borderColor: `${theme.colors.danger}20`,
+                  marginTop: 8,
+                }}>
+                  <AlertCircle size={18} color={theme.colors.danger} />
+                  <View style={{ flex: 1, marginLeft: 8 }}>
+                    <Text style={{ fontSize: 12, color: theme.colors.danger, fontWeight: "600", lineHeight: 16 }}>
+                      Login to accept this job.
+                    </Text>
+                  </View>
+                </View>
+              </AppCard>
+            </Pressable>
+          ) : (
+            <AppCard style={styles.card}>
+              <Text style={[styles.actionCardTitle, { color: theme.colors.text }]}>Pending Acceptance</Text>
+              <Text style={{ fontSize: 13, color: theme.colors.textMuted, marginBottom: 16 }}>
+                Review customer details and accept this ticket to start the execution flow.
+              </Text>
+              <View style={styles.btnRow}>
+                <AppButton
+                  title="Reject"
+                  variant="outline"
+                  onPress={() => navigation.navigate("RejectTicket", { jobId: job.id, ticketNo: job.ticketNo })}
+                  style={{ flex: 1, borderColor: theme.colors.danger }}
+                  textStyle={{ color: theme.colors.danger }}
+                />
+                <AppButton
+                  title="Accept Ticket"
+                  onPress={() => navigation.navigate("AcceptTicket", { jobId: job.id, ticketNo: job.ticketNo, customerName: job.customerName, service: job.service })}
+                  style={{ flex: 1.5 }}
+                />
+              </View>
+            </AppCard>
+          )
         )}
 
         {/* 2. ACCEPTED */}
@@ -746,7 +772,12 @@ export const TechnicianJobDetailsScreen = () => {
             </Text>
             <AppButton
               title="Start Travel"
-              onPress={() => handleStatusChange("TRAVELLING")}
+              onPress={async () => {
+                try {
+                  await handleStatusChange("TRAVELLING");
+                  navigation.navigate("TravelTracking", { jobId: job.id, ticketNo: job.ticketNo, address: job.address });
+                } catch {}
+              }}
               loading={updateStatusMutation.isPending}
             />
           </AppCard>
@@ -757,30 +788,11 @@ export const TechnicianJobDetailsScreen = () => {
           <AppCard style={styles.card}>
             <Text style={[styles.actionCardTitle, { color: theme.colors.text }]}>On the Way</Text>
             <Text style={{ fontSize: 13, color: theme.colors.textMuted, marginBottom: 16 }}>
-              Fetching real-time GPS coordinate as proof of location arrival.
+              You are currently travelling. Tap below to open travel tracking screen.
             </Text>
-
-            {gpsLoading ? (
-              <AppLoader message="Acquiring location coordinates..." />
-            ) : gpsError ? (
-              <View style={[styles.gpsErrorContainer, { backgroundColor: `${theme.colors.warning}10` }]}>
-                <Text style={{ color: theme.colors.warning, fontSize: 12 }}>{gpsError}</Text>
-                <AppButton title="Retry Location Capture" onPress={fetchGPS} variant="outline" size="sm" style={{ marginTop: 8 }} />
-              </View>
-            ) : gpsCoords ? (
-              <View style={[styles.gpsSuccessContainer, { backgroundColor: `${theme.colors.success}10`, borderColor: theme.colors.success }]}>
-                <Text style={{ color: theme.colors.success, fontSize: 12, fontWeight: "600" }}>
-                  GPS Coords Captured: {gpsCoords.lat}, {gpsCoords.lng}
-                </Text>
-              </View>
-            ) : null}
-
             <AppButton
-              title="Mark as Reached"
-              disabled={gpsLoading} // Commented out for testing: !gpsCoords || gpsLoading
-              onPress={() => handleStatusChange("REACHED")}
-              loading={updateStatusMutation.isPending}
-              style={{ marginTop: 12 }}
+              title="View Travel Tracking"
+              onPress={() => navigation.navigate("TravelTracking", { jobId: job.id, ticketNo: job.ticketNo, address: job.address })}
             />
           </AppCard>
         )}
@@ -790,19 +802,17 @@ export const TechnicianJobDetailsScreen = () => {
           <AppCard style={styles.card}>
             <Text style={[styles.actionCardTitle, { color: theme.colors.text }]}>Reached Site Location</Text>
             <Text style={{ fontSize: 13, color: theme.colors.textMuted, marginBottom: 16 }}>
-              You have reached the client's location. Tap below to start executing the job.
+              You have reached the client's location. Tap below to capture site photos and start work.
             </Text>
-
             <AppButton
-              title="Start Job"
-              onPress={() => handleStatusChange("IN_PROGRESS")}
-              loading={updateStatusMutation.isPending}
+              title="Begin Job Execution"
+              onPress={() => navigation.navigate("StartJob", { jobId: job.id, ticketNo: job.ticketNo })}
             />
           </AppCard>
         )}
 
         {/* 5. IN_PROGRESS */}
-        {job.status === "IN_PROGRESS" && !pendingFormVisible && !completeFormVisible && (
+        {job.status === "IN_PROGRESS" && (
           <AppCard style={styles.card}>
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
               <Text style={[styles.actionCardTitle, { color: theme.colors.text, marginBottom: 0 }]}>Job in Progress</Text>
@@ -813,365 +823,67 @@ export const TechnicianJobDetailsScreen = () => {
             </View>
 
             <Text style={{ fontSize: 13, color: theme.colors.textMuted, marginBottom: 14 }}>
-              Update ticket status to Pending or mark it as Completed after resolution.
+              Job execution is active. View the work timer to manage pending status or complete work.
             </Text>
 
-            {liveDuration ? (
-              <View style={[styles.timerContainer, { backgroundColor: `${theme.colors.success}05`, borderColor: `${theme.colors.success}15`, paddingVertical: 16, alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 6, marginBottom: 16 }]}>
-                <Text style={{ fontSize: 11, color: theme.colors.textMuted, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.8 }}>
-                  Work Time Elapsed
-                </Text>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                  <Clock size={20} color={theme.colors.success} />
-                  <Text style={{ fontSize: 26, color: theme.colors.success, fontWeight: "700", fontFamily: Platform.OS === "ios" ? "Courier" : "monospace", letterSpacing: 1 }}>
-                    {liveDuration}
-                  </Text>
-                </View>
-              </View>
-            ) : null}
-
-            <View style={styles.btnRow}>
-              <AppButton
-                title="Mark Pending"
-                variant="warning"
-                onPress={() => setPendingFormVisible(true)}
-                style={{ flex: 1 }}
-                icon={<AlertTriangle size={14} color="#ffffff" />}
-              />
-              <AppButton
-                title="Complete Job"
-                variant="success"
-                onPress={() => setCompleteFormVisible(true)}
-                style={{ flex: 1.5 }}
-              />
-            </View>
-          </AppCard>
-        )}
-
-        {/* Mark Pending Inline Form */}
-        {pendingFormVisible && (
-          <AppCard style={styles.formCard}>
-            <Text style={[styles.formTitle, { color: theme.colors.text }]}>Mark Ticket Pending</Text>
-            <View style={{ gap: 8, marginBottom: 16 }}>
-              {PENDING_REASONS.map((r) => {
-                const isSel = selectedPendingReason === r;
-                return (
-                  <Pressable
-                    key={r}
-                    onPress={() => setSelectedPendingReason(r)}
-                    style={[
-                      styles.reasonOption,
-                      {
-                        backgroundColor: isSel ? `${theme.colors.primary}10` : theme.colors.background,
-                        borderColor: isSel ? theme.colors.primary : theme.colors.borderLight,
-                      },
-                    ]}
-                  >
-                    <Text style={{ color: isSel ? theme.colors.primary : theme.colors.text }}>{r}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            <AppInput
-              label="Pending Notes / Comments"
-              placeholder="e.g. Compressor unit needs order..."
-              value={pendingNotes}
-              onChangeText={setPendingNotes}
+            <AppButton
+              title="Open Work Timer"
+              onPress={() => navigation.navigate("WorkTimer", { jobId: job.id, ticketNo: job.ticketNo })}
+              icon={<Clock size={16} color="#ffffff" />}
             />
-            <View style={styles.btnRow}>
-              <AppButton title="Cancel" variant="outline" onPress={() => setPendingFormVisible(false)} style={{ flex: 1 }} />
-              <AppButton title="Submit" onPress={handlePendingSubmit} loading={markPendingMutation.isPending} style={{ flex: 1.5 }} />
-            </View>
-          </AppCard>
-        )}
-
-        {/* Complete Job Inline Form */}
-        {completeFormVisible && (
-          <AppCard style={styles.completeFormCard}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 18, borderBottomWidth: 1, borderBottomColor: theme.colors.borderLight, paddingBottom: 10 }}>
-              <CheckCircle2 size={20} color={theme.colors.success} />
-              <Text style={[styles.formTitle, { color: theme.colors.text, marginBottom: 0 }]}>Complete Job Details</Text>
-            </View>
-
-            {/* Work Duration Digital Stopwatch Readout Input */}
-            <View style={{ backgroundColor: `${theme.colors.success}05`, borderWidth: 1, borderColor: `${theme.colors.success}20`, borderRadius: 12, padding: 14, marginBottom: 16, alignItems: "center" }}>
-              <Text style={{ fontSize: 10, fontWeight: "700", color: theme.colors.textMuted, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 6 }}>Captured Work Duration</Text>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                <Clock size={18} color={theme.colors.success} />
-                <TextInput
-                  value={duration}
-                  onChangeText={setDuration}
-                  style={{ fontSize: 24, fontWeight: "700", color: theme.colors.success, fontFamily: Platform.OS === "ios" ? "Courier" : "monospace", letterSpacing: 1, padding: 0, textAlign: "center" }}
-                  placeholder="00:00:00"
-                  placeholderTextColor={`${theme.colors.success}50`}
-                />
-              </View>
-              <Text style={{ fontSize: 10, color: theme.colors.textLight, marginTop: 6, fontWeight: "500" }}>Tap readout to manually adjust</Text>
-            </View>
-
-            <AppInput
-              label="Resolution Work Notes"
-              value={workNotes}
-              onChangeText={setWorkNotes}
-              placeholder="Describe resolution summary, parts replaced, etc..."
-              multiline
-              numberOfLines={3}
-              style={{ minHeight: 80, textAlignVertical: "top", paddingTop: 8 }}
-            />
-
-            {/* Photo Upload Section */}
-            <View style={{ marginBottom: 20 }}>
-              <Text style={{ fontSize: 11, fontWeight: "700", color: theme.colors.textMuted, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 8 }}>After Photos (Optional)</Text>
-
-              {job.afterPhotos && job.afterPhotos.length > 0 ? (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingVertical: 4 }}>
-                  {job.afterPhotos.map((p, idx) => (
-                    <View key={idx} style={{ position: "relative" }}>
-                      <Image source={{ uri: p }} style={{ width: 90, height: 90, borderRadius: 10 }} />
-                    </View>
-                  ))}
-                  <Pressable
-                    onPress={() => handlePhotoUpload("AFTER")}
-                    style={{ width: 90, height: 90, borderRadius: 10, borderWidth: 1.5, borderStyle: "dashed", borderColor: theme.colors.primary, justifyContent: "center", alignItems: "center", backgroundColor: `${theme.colors.primary}05` }}
-                  >
-                    <Camera size={20} color={theme.colors.primary} />
-                    <Text style={{ fontSize: 10, color: theme.colors.primary, fontWeight: "600", marginTop: 4 }}>Add Photo</Text>
-                  </Pressable>
-                </ScrollView>
-              ) : (
-                <View style={{ flexDirection: "row", gap: 12 }}>
-                  <Pressable
-                    onPress={() => handlePhotoUpload("AFTER")}
-                    style={({ pressed }) => [
-                      {
-                        flex: 1,
-                        flexDirection: "row",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: 8,
-                        paddingVertical: 14,
-                        borderRadius: 10,
-                        borderWidth: 1.5,
-                        borderStyle: "dashed",
-                        borderColor: theme.colors.border,
-                        backgroundColor: theme.colors.background,
-                        opacity: pressed ? 0.8 : 1,
-                      }
-                    ]}
-                  >
-                    <Camera size={20} color={theme.colors.textMuted} />
-                    <View>
-                      <Text style={{ fontSize: 13, fontWeight: "600", color: theme.colors.text }}>Use Camera</Text>
-                      <Text style={{ fontSize: 10, color: theme.colors.textMuted }}>Take photo</Text>
-                    </View>
-                  </Pressable>
-
-                  <Pressable
-                    onPress={() => handleGalleryUpload("AFTER")}
-                    style={({ pressed }) => [
-                      {
-                        flex: 1,
-                        flexDirection: "row",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: 8,
-                        paddingVertical: 14,
-                        borderRadius: 10,
-                        borderWidth: 1.5,
-                        borderStyle: "dashed",
-                        borderColor: theme.colors.border,
-                        backgroundColor: theme.colors.background,
-                        opacity: pressed ? 0.8 : 1,
-                      }
-                    ]}
-                  >
-                    <Upload size={20} color={theme.colors.textMuted} />
-                    <View>
-                      <Text style={{ fontSize: 13, fontWeight: "600", color: theme.colors.text }}>Browse Gallery</Text>
-                      <Text style={{ fontSize: 10, color: theme.colors.textMuted }}>Upload files</Text>
-                    </View>
-                  </Pressable>
-                </View>
-              )}
-            </View>
-
-            <View style={{ flexDirection: "row", gap: 12 }}>
-              <AppButton title="Cancel" variant="outline" onPress={() => setCompleteFormVisible(false)} style={{ flex: 1, borderRadius: 10 }} />
-              <AppButton title="Complete Ticket" variant="success" onPress={handleCompletionSubmit} loading={completeJobMutation.isPending} style={{ flex: 1.5, borderRadius: 10 }} />
-            </View>
           </AppCard>
         )}
 
         {/* 6. COMPLETED */}
-        {job.status === "COMPLETED" && !paymentFormVisible && (
+        {job.status === "COMPLETED" && (
           <AppCard style={styles.card}>
             <Text style={[styles.actionCardTitle, { color: theme.colors.text }]}>Service Completed</Text>
             <Text style={{ fontSize: 13, color: theme.colors.textMuted, marginBottom: 16 }}>
-              Tap below to log the payment collected from client.
+              Job execution is done. Tap below to log the payment details and generate the invoice.
             </Text>
             <AppButton
-              title="Collect Payment"
+              title="Collect Payment & Generate Invoice"
               variant="success"
-              onPress={() => setPaymentFormVisible(true)}
+              onPress={() => navigation.navigate("CompleteJob", { jobId: job.id, ticketNo: job.ticketNo, customerName: job.customerName ?? "", startStep: 3 })}
             />
           </AppCard>
         )}
 
-        {/* Payment Collection Inline Form */}
-        {paymentFormVisible && (
-          <AppCard style={styles.completeFormCard}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 18, borderBottomWidth: 1, borderBottomColor: theme.colors.borderLight, paddingBottom: 10 }}>
-              <DollarSign size={20} color={theme.colors.success} />
-              <Text style={[styles.formTitle, { color: theme.colors.text, marginBottom: 0 }]}>Payment Collection</Text>
-            </View>
-
-            {/* Ticket & Customer Metadata Double Column Display */}
-            <View style={{ flexDirection: "row", gap: 12, marginBottom: 16 }}>
-              <View style={{ flex: 1, backgroundColor: `${theme.colors.primary}05`, borderWidth: 1, borderColor: `${theme.colors.primary}10`, borderRadius: 10, padding: 12 }}>
-                <Text style={{ fontSize: 9, fontWeight: "700", color: theme.colors.textMuted, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 2 }}>Ticket ID</Text>
-                <Text style={{ fontSize: 13, fontWeight: "700", color: theme.colors.text }}>{job.ticketNo}</Text>
-              </View>
-              <View style={{ flex: 1.2, backgroundColor: `${theme.colors.success}05`, borderWidth: 1, borderColor: `${theme.colors.success}10`, borderRadius: 10, padding: 12 }}>
-                <Text style={{ fontSize: 9, fontWeight: "700", color: theme.colors.textMuted, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 2 }}>Customer</Text>
-                <Text style={{ fontSize: 13, fontWeight: "700", color: theme.colors.text }} numberOfLines={1}>{job.customerName}</Text>
-              </View>
-            </View>
-
-            {/* Collected Amount Input */}
-            <View style={{ marginBottom: 16 }}>
-              <Text style={{ fontSize: 10, fontWeight: "700", color: theme.colors.textMuted, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 6 }}>Collection Amount</Text>
-              <View style={{ flexDirection: "row", alignItems: "center", borderWidth: 1.5, borderColor: theme.colors.borderLight, borderRadius: 12, paddingHorizontal: 14, backgroundColor: theme.colors.background }}>
-                <Text style={{ fontSize: 20, fontWeight: "700", color: theme.colors.textLight, marginRight: 6 }}>₹</Text>
-                <TextInput
-                  value={paymentAmount}
-                  onChangeText={setPaymentAmount}
-                  placeholder="0.00"
-                  placeholderTextColor={theme.colors.textLight}
-                  keyboardType="decimal-pad"
-                  style={{ flex: 1, fontSize: 18, fontWeight: "700", color: theme.colors.text, height: 48, paddingVertical: 0 }}
-                />
-              </View>
-            </View>
-
-            {/* Payment Method Selector */}
-            <Text style={{ fontSize: 10, fontWeight: "700", color: theme.colors.textMuted, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 8 }}>Select Payment Mode</Text>
-            <View style={{ flexDirection: "row", gap: 12, marginBottom: 18 }}>
-              {["CASH", "UPI"].map((mode) => {
-                const isSel = paymentMethod === mode;
-                return (
-                  <Pressable
-                    key={mode}
-                    onPress={() => setPaymentMethod(mode)}
-                    style={{
-                      flex: 1,
-                      flexDirection: "row",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 8,
-                      paddingVertical: 14,
-                      borderRadius: 10,
-                      borderWidth: 1.5,
-                      borderColor: isSel ? theme.colors.primary : theme.colors.borderLight,
-                      backgroundColor: isSel ? `${theme.colors.primary}08` : theme.colors.card,
-                    }}
-                  >
-                    <View style={{ width: 14, height: 14, borderRadius: 7, borderWidth: 1.5, borderColor: isSel ? theme.colors.primary : theme.colors.textLight, alignItems: "center", justifyContent: "center" }}>
-                      {isSel && <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: theme.colors.primary }} />}
-                    </View>
-                    <Text style={{ color: isSel ? theme.colors.primary : theme.colors.text, fontSize: 13, fontWeight: "700", textTransform: "uppercase" }}>{mode}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-
-            {/* UPI QR Code Scanner Display */}
-            {paymentMethod === "UPI" && parseFloat(paymentAmount) > 0 && (
-              <View style={{ alignItems: "center", padding: 16, backgroundColor: `${theme.colors.primary}05`, borderRadius: 12, borderWidth: 1, borderColor: `${theme.colors.primary}10`, marginBottom: 18 }}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 12 }}>
-                  <Smartphone size={16} color={theme.colors.primary} />
-                  <Text style={{ fontSize: 12, fontWeight: "700", color: theme.colors.textMuted, textTransform: "uppercase" }}>Scan UPI QR Code</Text>
-                </View>
-                <View style={{ padding: 12, backgroundColor: "#ffffff", borderRadius: 12, shadowColor: theme.colors.shadow, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.1, shadowRadius: 6, elevation: 2 }}>
-                  <QRCode
-                    value={`upi://pay?pa=srinarmatha304@okicici&pn=FieldEaze+Services&am=${paymentAmount}&cu=INR&tn=ServicePayment`}
-                    size={140}
-                    backgroundColor="#ffffff"
-                    color="#0f172a"
-                  />
-                </View>
-                <Text style={{ fontSize: 12, fontWeight: "700", color: theme.colors.primary, marginTop: 10 }}>₹{paymentAmount}</Text>
-                <Text style={{ fontSize: 9, color: theme.colors.textLight, marginTop: 2 }}>UPI ID: srinarmatha304@okicici</Text>
-              </View>
-            )}
-
-            {paymentMethod === "UPI" && (!paymentAmount || parseFloat(paymentAmount) <= 0) && (
-              <View style={{ padding: 16, borderRadius: 10, borderWidth: 1.5, borderStyle: "dashed", borderColor: theme.colors.border, alignItems: "center", marginBottom: 18, backgroundColor: theme.colors.background }}>
-                <Text style={{ fontSize: 12, color: theme.colors.textMuted }}>Enter amount to generate scan QR code</Text>
-              </View>
-            )}
-
-            {/* Customer Signature Requirement Notice */}
-            <View style={{ backgroundColor: `${theme.colors.warning}05`, borderWidth: 1, borderColor: `${theme.colors.warning}15`, borderRadius: 8, padding: 12, marginBottom: 16 }}>
-              <Text style={{ fontSize: 11, fontWeight: "700", color: theme.colors.warning, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 }}>Customer Signature</Text>
-              <Text style={{ fontSize: 12, color: theme.colors.textMuted }}>Pending backend signature capture API support.</Text>
-            </View>
-
-            {/* Payment Confirmation Toggle */}
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: 12,
-                borderRadius: 8,
-                borderWidth: 1,
-                backgroundColor: paymentConfirmed ? `${theme.colors.success}08` : theme.colors.background,
-                borderColor: paymentConfirmed ? theme.colors.success : theme.colors.borderLight,
-                marginBottom: 20,
-                gap: 12,
-              }}
-            >
+        {/* 7. CLOSED / INVOICE_GENERATED */}
+        {(job.status === "CLOSED" || (job.status as string) === "INVOICE_GENERATED") && (
+          <AppCard style={styles.card}>
+            <View style={[styles.successBanner, { backgroundColor: `${theme.colors.success}10`, borderColor: theme.colors.success, marginBottom: 16 }]}>
+              <CheckCircle2 size={24} color={theme.colors.success} style={{ marginRight: 8 }} />
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 13, fontWeight: "700", color: theme.colors.text }}>Confirm Payment Received</Text>
-                <Text style={{ fontSize: 11, color: theme.colors.textMuted, marginTop: 1 }}>Toggle only after money is collected</Text>
-              </View>
-              <Switch
-                value={paymentConfirmed}
-                onValueChange={setPaymentConfirmed}
-                trackColor={{ false: theme.colors.borderLight, true: `${theme.colors.success}60` }}
-                thumbColor={paymentConfirmed ? theme.colors.success : theme.colors.textLight}
-              />
-            </View>
-
-            <View style={styles.btnRow}>
-              <AppButton title="Cancel" variant="outline" onPress={() => setPaymentFormVisible(false)} style={{ flex: 1, borderRadius: 10 }} />
-              <AppButton
-                title="Submit Payment"
-                variant="success"
-                onPress={handlePaymentSubmit}
-                loading={collectPaymentMutation.isPending}
-                disabled={!paymentConfirmed || !paymentAmount || parseFloat(paymentAmount) <= 0}
-                style={{ flex: 1.6, borderRadius: 10 }}
-              />
-            </View>
-          </AppCard>
-        )}
-
-        {/* 7. CLOSED */}
-        {job.status === "CLOSED" && (
-          <View style={[styles.successBanner, { backgroundColor: `${theme.colors.success}10`, borderColor: theme.colors.success }]}>
-            <CheckCircle2 size={24} color={theme.colors.success} style={{ marginRight: 8 }} />
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: theme.colors.success, fontWeight: "700", fontSize: 14 }}>
-                Ticket Closed & Settled
-              </Text>
-              {job.paymentCollection !== undefined && (
-                <Text style={{ fontSize: 12, color: theme.colors.textMuted, marginTop: 4 }}>
-                  Payment: ₹{job.paymentCollection} via {job.paymentMethod}
+                <Text style={{ color: theme.colors.success, fontWeight: "700", fontSize: 14 }}>
+                  Ticket Closed & Settled
                 </Text>
-              )}
+                {job.paymentCollection !== undefined && (
+                  <Text style={{ fontSize: 12, color: theme.colors.textMuted, marginTop: 4 }}>
+                    Payment: ₹{job.paymentCollection} via {job.paymentMethod}
+                  </Text>
+                )}
+              </View>
             </View>
-          </View>
+            
+            <AppButton
+              title="View Invoice Details"
+              variant="outline"
+              onPress={() => navigation.navigate("InvoiceGenerate", {
+                jobId: job.id,
+                ticketNo: job.ticketNo,
+                amount: job.paymentCollection ?? 0,
+                paymentMethod: job.paymentMethod ?? "CASH",
+                invoiceNo: job.invoiceNo ?? `INV-${job.ticketNo}`,
+                invoiceSubtotal:   job.invoiceSubtotal,
+                invoiceGstAmount:  job.invoiceGstAmount,
+                invoiceGstPercent: job.invoiceGstPercent,
+                invoiceTotal:      job.invoiceTotal,
+                invoiceGeneratedAt: job.invoiceGeneratedAt,
+              })}
+              icon={<Receipt size={16} color={theme.colors.primary} />}
+            />
+          </AppCard>
         )}
 
         {/* 8. PENDING / RESCHEDULED */}
@@ -1234,21 +946,7 @@ export const TechnicianJobDetailsScreen = () => {
           </AppCard>
         )}
 
-        {/* Customer Attached Images */}
-        {job.images && job.images.length > 0 && job.status !== "COMPLETED" && job.status !== "CLOSED" && (
-          <>
-            <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>Attached Images</Text>
-            <View style={styles.photoGrid}>
-              {job.images.map((imgUrl, index) => (
-                <Image
-                  key={index}
-                  source={{ uri: imgUrl }}
-                  style={styles.photoThumbnail}
-                />
-              ))}
-            </View>
-          </>
-        )}
+        {/* Media section moved above execution controls */}
 
         {/* Upload Status State Overlay */}
         {uploadingImage && (

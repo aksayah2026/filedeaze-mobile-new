@@ -28,6 +28,14 @@ export function useTechnicianJobs(month?: number, year?: number) {
   });
 }
 
+export function useTechnicianInvoices(month?: number, year?: number) {
+  return useQuery({
+    queryKey: ["technician-invoices", month, year],
+    queryFn: () => JobService.getTechnicianInvoices(month, year),
+    staleTime: 10_000,
+  });
+}
+
 export function useJobDetails(ticketNo: string) {
   return useQuery({
     queryKey: jobQueryKeys.details(ticketNo),
@@ -106,6 +114,8 @@ export function useCompleteJob() {
         duration: string;
         paymentCollection?: number;
         paymentMethod?: string;
+        lat?: number;
+        lng?: number;
       };
     }) => JobService.completeJob(ticketNo, payload),
     onSuccess: (data) => {

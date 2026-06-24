@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Image, Linking, Alert, Modal, Pressable } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Linking, Alert, Modal, Pressable } from "react-native";
 import { useRoute, useNavigation, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
@@ -11,6 +11,12 @@ import {
   X,
   Star,
   HelpCircle,
+  PlusCircle,
+  UserCheck,
+  Wrench,
+  CheckCircle2,
+  XCircle,
+  ShieldCheck,
 } from "lucide-react-native";
 
 import { useTheme } from "../../theme";
@@ -31,7 +37,7 @@ export const CustomerJobDetailsScreen = () => {
   const navigation = useNavigation<NavigationProp>();
   const { jobId } = route.params;
 
-  const { data: ticket, isLoading, refetch } = useCustomerTicketDetails(jobId);
+  const { data: ticket, isLoading, refetch } = useCustomerTicketDetails(jobId, { refetchInterval: 5000 });
   const cancelTicketMutation = useCancelCustomerTicket();
 
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
@@ -73,13 +79,17 @@ export const CustomerJobDetailsScreen = () => {
         return { label: "ACCEPTED", variant: "warning" as const };
       case "TRAVELLING":
         return { label: "EN ROUTE", variant: "warning" as const };
+      case "REACHED":
       case "REACHED_LOCATION":
         return { label: "ARRIVED", variant: "warning" as const };
       case "IN_PROGRESS":
         return { label: "IN PROGRESS", variant: "warning" as const };
       case "COMPLETED":
         return { label: "COMPLETED", variant: "success" as const };
+      case "INVOICE_GENERATED":
+        return { label: "INVOICE GENERATED", variant: "success" as const };
       case "TICKET_CLOSED":
+      case "CLOSED":
         return { label: "CLOSED", variant: "success" as const };
       case "CANCELLED":
         return { label: "CANCELLED", variant: "danger" as const };
@@ -88,12 +98,41 @@ export const CustomerJobDetailsScreen = () => {
     }
   };
 
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "NEW_TICKET":
+        return PlusCircle;
+      case "ASSIGNED":
+      case "ACCEPTED":
+        return UserCheck;
+      case "TRAVELLING":
+      case "REACHED":
+      case "REACHED_LOCATION":
+        return MapPin;
+      case "IN_PROGRESS":
+        return Wrench;
+      case "COMPLETED":
+      case "INVOICE_GENERATED":
+      case "TICKET_CLOSED":
+      case "CLOSED":
+        return CheckCircle2;
+      case "CANCELLED":
+        return XCircle;
+      default:
+        return HelpCircle;
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    return theme.colors.primary;
+  };
+
   const badgeProps = getStatusBadgeProps(ticket.status);
 
   // Conditions
   const isCancellable = ["NEW_TICKET", "ASSIGNED", "ACCEPTED"].includes(ticket.status);
   const isTrackable = ["TRAVELLING", "REACHED_LOCATION", "IN_PROGRESS"].includes(ticket.status);
-  const isClosed = ["COMPLETED", "TICKET_CLOSED"].includes(ticket.status);
+  const isClosed = ["COMPLETED", "INVOICE_GENERATED", "TICKET_CLOSED", "CLOSED"].includes(ticket.status);
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return "—";
@@ -159,7 +198,13 @@ export const CustomerJobDetailsScreen = () => {
                 </Text>
               </View>
               <View style={styles.techText}>
-                <Text style={[styles.techName, { color: theme.colors.text }]}>{ticket.technician.name}</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <Text style={[styles.techName, { color: theme.colors.text }]}>{ticket.technician.name}</Text>
+                  <View style={[styles.verifiedBadge, { backgroundColor: `${theme.colors.success}12` }]}>
+                    <ShieldCheck size={11} color={theme.colors.success} />
+                    <Text style={[styles.verifiedText, { color: theme.colors.success }]}>Verified</Text>
+                  </View>
+                </View>
                 <Text style={[styles.techRole, { color: theme.colors.textMuted, marginTop: 2 }]}>
                   Certified Field Service Technician
                 </Text>
@@ -226,80 +271,116 @@ export const CustomerJobDetailsScreen = () => {
           </View>
         </View>
 
-        {/* Feedback Section (if completed) */}
-        {isClosed && (
-          <>
-            <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>Service Feedback</Text>
-            <View style={[styles.premiumCard, { backgroundColor: theme.colors.card }]}>
-              {ticket.feedback ? (
-                <View style={styles.feedbackShow}>
-                  <View style={styles.starsRow}>
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Star
-                        key={star}
-                        size={18}
-                        color={star <= ticket.feedback!.rating ? theme.colors.warning : theme.colors.textLight}
-                        fill={star <= ticket.feedback!.rating ? theme.colors.warning : "transparent"}
-                      />
-                    ))}
-                  </View>
-                  <Text style={{ color: theme.colors.text, fontSize: 14, marginTop: 8, fontStyle: "italic" }}>
-                    "{ticket.feedback.review}"
-                  </Text>
-                </View>
-              ) : (
-                <AppButton
-                  title="Submit Feedback"
-                  onPress={() => navigation.navigate("Feedback", { ticketId: ticket.id, ticketNumber: ticket.ticketNumber })}
-                />
-              )}
-            </View>
-          </>
-        )}
-
         {/* Visual Progress Timeline */}
         <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>Timeline</Text>
 
         <View style={[styles.premiumCard, { backgroundColor: theme.colors.card, paddingVertical: 20 }]}>
           {ticket.statusLogs && ticket.statusLogs.length > 0 ? (
-            ticket.statusLogs.map((log, index) => {
-              const isLast = index === ticket.statusLogs.length - 1;
-              const subProps = getStatusBadgeProps(log.status);
+            <>
+              {ticket.statusLogs.map((log, index) => {
+                const isLast = index === ticket.statusLogs.length - 1;
+                const subProps = getStatusBadgeProps(log.status);
+                const StatusIcon = getStatusIcon(log.status);
+                const statusColor = getStatusColor(log.status);
+                const showLine = !isLast || isClosed;
 
-              return (
-                <View key={log.id} style={styles.timelineItem}>
+                return (
+                  <View key={log.id} style={styles.timelineItem}>
+                    <View style={styles.timelineIndicator}>
+                      <View style={[
+                        styles.timelineDotContainer,
+                        {
+                          backgroundColor: `${theme.colors.primary}12`,
+                          borderColor: isLast && !isClosed ? theme.colors.primary : `${theme.colors.primary}40`,
+                          borderWidth: isLast && !isClosed ? 2 : 1.5,
+                        }
+                      ]}>
+                        <StatusIcon size={12} color={theme.colors.primary} />
+                      </View>
+                      {showLine && <View style={[styles.timelineLine, { backgroundColor: theme.colors.primary }]} />}
+                    </View>
+                    <View style={styles.timelineContent}>
+                      <View style={styles.timelineHeader}>
+                        <Text style={[styles.timelineStatusText, { color: theme.colors.primary, fontWeight: "700" }]}>
+                          {subProps.label}
+                        </Text>
+                        <View style={styles.timeWrapper}>
+                          <Clock size={11} color={theme.colors.textMuted} style={{ marginRight: 3 }} />
+                          <Text style={{ fontSize: 11, color: theme.colors.textMuted }}>
+                            {formatDate(log.changedAt)}
+                          </Text>
+                        </View>
+                      </View>
+                      {log.notes && (
+                        <Text style={{ fontSize: 12, color: theme.colors.textMuted, marginTop: 4, lineHeight: 16 }}>
+                          {log.notes}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                );
+              })}
+
+              {/* Integrated Feedback Node as part of the timeline */}
+              {isClosed && (
+                <View style={styles.timelineItem}>
                   <View style={styles.timelineIndicator}>
                     <View style={[
-                      styles.timelineDot,
+                      styles.timelineDotContainer,
                       {
-                        backgroundColor: isLast ? theme.colors.primary : "#ffffff",
-                        borderColor: isLast ? `${theme.colors.primary}40` : theme.colors.borderLight,
-                        borderWidth: isLast ? 4 : 2,
+                        backgroundColor: `${theme.colors.primary}12`,
+                        borderColor: theme.colors.primary,
+                        borderWidth: 2,
                       }
-                    ]} />
-                    {!isLast && <View style={[styles.timelineLine, { backgroundColor: theme.colors.borderLight }]} />}
+                    ]}>
+                      <Star size={12} color={theme.colors.primary} fill={ticket.feedback ? theme.colors.primary : "transparent"} />
+                    </View>
                   </View>
                   <View style={styles.timelineContent}>
                     <View style={styles.timelineHeader}>
-                      <Text style={[styles.timelineStatusText, { color: isLast ? theme.colors.primary : theme.colors.text, fontWeight: isLast ? "700" : "600" }]}>
-                        {subProps.label}
+                      <Text style={[styles.timelineStatusText, { color: theme.colors.primary, fontWeight: "700" }]}>
+                        SERVICE FEEDBACK
                       </Text>
-                      <View style={styles.timeWrapper}>
-                        <Clock size={11} color={theme.colors.textMuted} style={{ marginRight: 3 }} />
-                        <Text style={{ fontSize: 11, color: theme.colors.textMuted }}>
-                          {formatDate(log.changedAt)}
-                        </Text>
-                      </View>
                     </View>
-                    {log.notes && (
-                      <Text style={{ fontSize: 12, color: theme.colors.textMuted, marginTop: 4, lineHeight: 16 }}>
-                        {log.notes}
-                      </Text>
-                    )}
+                    <View style={{ marginTop: 8 }}>
+                      {ticket.feedback ? (
+                        <View style={{ alignItems: "flex-start" }}>
+                          <View style={styles.starsRow}>
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Star
+                                key={star}
+                                size={14}
+                                color={star <= ticket.feedback!.rating ? theme.colors.warning : theme.colors.textLight}
+                                fill={star <= ticket.feedback!.rating ? theme.colors.warning : "transparent"}
+                              />
+                            ))}
+                          </View>
+                          <Text style={{ color: theme.colors.text, fontSize: 13, marginTop: 6, fontStyle: "italic" }}>
+                            "{ticket.feedback.review}"
+                          </Text>
+                        </View>
+                      ) : (
+                        <Pressable
+                          style={({ pressed }) => [
+                            styles.callButton,
+                            {
+                              backgroundColor: `${theme.colors.primary}12`,
+                              opacity: pressed ? 0.7 : 1,
+                              alignSelf: "flex-start",
+                              marginTop: 4,
+                            }
+                          ]}
+                          onPress={() => navigation.navigate("Feedback", { ticketId: ticket.id, ticketNumber: ticket.ticketNumber })}
+                        >
+                          <Star size={14} color={theme.colors.primary} style={{ marginRight: 6 }} />
+                          <Text style={[styles.callButtonText, { color: theme.colors.primary }]}>Submit Feedback</Text>
+                        </Pressable>
+                      )}
+                    </View>
                   </View>
                 </View>
-              );
-            })
+              )}
+            </>
           ) : (
             <View style={{ alignItems: "center", padding: 20 }}>
               <Text style={{ color: theme.colors.textMuted }}>No history logs yet</Text>
@@ -449,6 +530,18 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700",
   },
+  verifiedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 12,
+  },
+  verifiedText: {
+    fontSize: 9,
+    fontWeight: "700",
+  },
   techRole: {
     fontSize: 12,
     marginTop: 2,
@@ -498,10 +591,12 @@ const styles = StyleSheet.create({
     width: 28,
     alignItems: "center",
   },
-  timelineDot: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
+  timelineDotContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
     marginTop: 4,
     zIndex: 2,
   },
@@ -584,3 +679,4 @@ const styles = StyleSheet.create({
 });
 
 export default CustomerJobDetailsScreen;
+

@@ -20,6 +20,9 @@ import { AppHeader } from "../../components/AppHeader";
 import { AppCard } from "../../components/AppCard";
 import { AppButton } from "../../components/AppButton";
 import { AppLoader } from "../../components/AppLoader";
+import { AppSuccessModal } from "../../components/AppSuccessModal";
+import { AppAlertModal } from "../../components/AppAlertModal";
+import { AppConfirmModal } from "../../components/AppConfirmModal";
 
 type RouteProps = RouteProp<TechnicianStackParamList, "StartJob">;
 type NavigationProp = NativeStackNavigationProp<TechnicianStackParamList, "StartJob">;
@@ -35,9 +38,24 @@ export const StartJobScreen = () => {
 
   const [beforePhotos, setBeforePhotos] = useState<string[]>([]);
 
+  // Styled alert popup states
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState("");
+  const [alertMessage, setAlertMessage] = useState("");
+  const [alertType, setAlertType] = useState<"success" | "error" | "warning">("warning");
+  const [earlyStartModalVisible, setEarlyStartModalVisible] = useState(false);
+
+  const showAlert = (title: string, message: string, type: "success" | "error" | "warning" = "warning") => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertType(type);
+    setAlertVisible(true);
+  };
+
   // Timer
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [timerRunning, setTimerRunning] = useState(false);
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -63,7 +81,7 @@ export const StartJobScreen = () => {
   const pickFromCamera = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("Permission Needed", "Camera access is required to capture before photos.");
+      showAlert("Permission Needed", "Camera access is required to capture before photos.", "error");
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
@@ -79,7 +97,7 @@ export const StartJobScreen = () => {
   const pickFromGallery = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("Permission Needed", "Photo library access is required.");
+      showAlert("Permission Needed", "Photo library access is required.", "error");
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -97,23 +115,37 @@ export const StartJobScreen = () => {
     setBeforePhotos((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleStartJob = async () => {
-    if (beforePhotos.length === 0) {
-      Alert.alert("Before Photos Required", "Please capture at least 1 before photo of the job site.");
-      return;
-    }
-
+  const startJobMutationCall = async () => {
     try {
       await savePhotosMutation.mutateAsync({ ticketNo: jobId, photos: beforePhotos });
       setTimerRunning(true);
-      Alert.alert(
-        "Job Started ✓",
-        "Status set to IN PROGRESS. Your work timer has started.",
-        [{ text: "OK", onPress: () => navigation.navigate("TechnicianHome") }]
-      );
+      setSuccessModalVisible(true);
     } catch (err: any) {
-      Alert.alert("Error", err.message || "Failed to start job.");
+      showAlert("Error", err.message || "Failed to start job.", "error");
     }
+  };
+
+  const handleStartJob = async () => {
+    if (beforePhotos.length === 0) {
+      showAlert("Before Photos Required", "Please capture at least 1 before photo of the job site.", "warning");
+      return;
+    }
+
+    if (job?.scheduledAt) {
+      const scheduledTimeMs = new Date(job.scheduledAt).getTime();
+      const currentTimeMs = new Date().getTime();
+      if (currentTimeMs < scheduledTimeMs) {
+        setEarlyStartModalVisible(true);
+        return;
+      }
+    }
+
+    await startJobMutationCall();
+  };
+
+  const handleSuccessClose = () => {
+    setSuccessModalVisible(false);
+    navigation.navigate("TechnicianHome");
   };
 
   if (isLoading) {
@@ -272,6 +304,39 @@ export const StartJobScreen = () => {
           />
         </View>
       </ScrollView>
+
+      {/* App Success Modal */}
+      <AppSuccessModal
+        visible={successModalVisible}
+        title="Job Started ✓"
+        message="Status set to IN PROGRESS. Your work timer has started."
+        onClose={handleSuccessClose}
+        autoCloseDelay={2000}
+      />
+
+      {/* Custom Alert/Warning Modal */}
+      <AppAlertModal
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        type={alertType}
+        onClose={() => setAlertVisible(false)}
+      />
+
+      {/* Early Start Warning Modal */}
+      <AppConfirmModal
+        visible={earlyStartModalVisible}
+        title="Early Start Warning"
+        message={`You are starting this job before the scheduled visit time (${job?.scheduledDate} · ${job?.scheduledTime}).\n\nAre you sure you want to proceed and start work now?`}
+        confirmText="Yes, Start Now"
+        cancelText="Cancel"
+        confirmVariant="warning"
+        onConfirm={async () => {
+          setEarlyStartModalVisible(false);
+          await startJobMutationCall();
+        }}
+        onCancel={() => setEarlyStartModalVisible(false)}
+      />
     </View>
   );
 };

@@ -59,11 +59,12 @@ export function useCustomerTickets(status?: string) {
   });
 }
 
-export function useCustomerTicketDetails(id: string) {
+export function useCustomerTicketDetails(id: string, options?: { refetchInterval?: number }) {
   return useQuery({
     queryKey: customerKeys.ticket(id),
     queryFn: () => CustomerService.getTicketDetails(id),
     enabled: !!id,
+    refetchInterval: options?.refetchInterval,
   });
 }
 

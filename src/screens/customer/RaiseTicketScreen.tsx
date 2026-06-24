@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,9 @@ import {
   Image,
   Modal,
   FlatList,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -34,6 +37,7 @@ import {
   Edit2,
   Trash2,
   Map,
+  Play,
 } from "lucide-react-native";
 import * as ImagePicker from "expo-image-picker";
 import { useTheme } from "../../theme";
@@ -77,7 +81,7 @@ export const RaiseTicketScreen = () => {
   const [preferredDate, setPreferredDate] = useState<Date | null>(null);
   const [preferredTimeSlot, setPreferredTimeSlot] = useState("");
   const [address, setAddress] = useState("");
-  const [images, setImages] = useState<string[]>([]);
+  const [images, setImages] = useState<{ uri: string; type: "image" | "video" }[]>([]);
   const [imageNotes, setImageNotes] = useState("");
 
   // Address modal states
@@ -92,12 +96,19 @@ export const RaiseTicketScreen = () => {
   const [addressSubmitAttempted, setAddressSubmitAttempted] = useState(false);
 
   // Subcategories fetched dynamically based on selected Category
+  // The catalog endpoint returns { subCategories: [...with serviceCharges] }
   const { data: catDetails, isLoading: isLoadingSubs } = useCategoryDetails(selectedCat?.id);
-  const subCategories = Array.isArray(catDetails) ? catDetails : (catDetails?.services || []);
+  const subCategories = Array.isArray(catDetails)
+    ? catDetails
+    : (catDetails?.subCategories || catDetails?.services || []);
 
   // Dropdown UI states
   const [catModalVisible, setCatModalVisible] = useState(false);
   const [subModalVisible, setSubModalVisible] = useState(false);
+
+  // Search states for category/sub-category pickers
+  const [catSearch, setCatSearch] = useState("");
+  const [subSearch, setSubSearch] = useState("");
 
   // Custom Modal states for Date and Time Pickers
   const [dateModalVisible, setDateModalVisible] = useState(false);
@@ -202,6 +213,27 @@ export const RaiseTicketScreen = () => {
     return <Settings size={22} color={theme.colors.primary} />;
   };
 
+  // Typed variant used in the grid tile so color + size can be overridden
+  const getCategoryIconEl = (name: string, color: string, size: number) => {
+    const n = name.toLowerCase();
+    if (n.includes("electrical") || n.includes("power") || n.includes("wire")) {
+      return <Zap size={size} color={color} />;
+    }
+    if (n.includes("plumb") || n.includes("water") || n.includes("leak")) {
+      return <Droplet size={size} color={color} />;
+    }
+    if (n.includes("ac") || n.includes("cool") || n.includes("heat") || n.includes("hvac")) {
+      return <Flame size={size} color={color} />;
+    }
+    if (n.includes("carpenter") || n.includes("wood") || n.includes("furniture")) {
+      return <Hammer size={size} color={color} />;
+    }
+    if (n.includes("repair") || n.includes("fix") || n.includes("appliance")) {
+      return <Wrench size={size} color={color} />;
+    }
+    return <Settings size={size} color={color} />;
+  };
+
   const validate = () => {
     const newErrors: Record<string, string> = {};
     if (!selectedCat) newErrors.category = "Category is required";
@@ -209,20 +241,24 @@ export const RaiseTicketScreen = () => {
     if (!description.trim()) newErrors.description = "Description is required";
     if (!preferredDate || !preferredTimeSlot) newErrors.preferredDate = "Visit Date and Time slot are required";
     if (!address.trim()) newErrors.address = "Address is required";
-    if (images.length === 0) newErrors.images = "At least 1 image is required";
-    if (!imageNotes.trim()) newErrors.imageNotes = "Image notes are required";
+    if (images.length === 0) newErrors.images = "At least 1 photo or video is required";
+    if (!imageNotes.trim()) newErrors.imageNotes = "Media notes are required";
     return newErrors;
   };
 
   const handlePickFromCamera = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
-      triggerPopup("warning", "Permission Required", "Camera access is needed to capture issue photos.");
+      triggerPopup("warning", "Permission Required", "Camera access is needed to capture issue media.");
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({ quality: 0.7 });
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      quality: 0.7,
+    });
     if (!result.canceled && result.assets[0]) {
-      setImages((p) => [...p, result.assets[0].uri]);
+      const asset = result.assets[0];
+      setImages((p) => [...p, { uri: asset.uri, type: (asset.type === "video" ? "video" : "image") as "image" | "video" }]);
       if (errors.images) setErrors((prev) => ({ ...prev, images: "" }));
     }
   };
@@ -230,17 +266,21 @@ export const RaiseTicketScreen = () => {
   const handlePickFromGallery = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      triggerPopup("warning", "Permission Required", "Gallery access is needed to upload issue photos.");
+      triggerPopup("warning", "Permission Required", "Gallery access is needed to upload issue media.");
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: "images",
+      mediaTypes: ImagePicker.MediaTypeOptions.All,
       quality: 0.7,
       allowsMultipleSelection: true,
       selectionLimit: 5 - images.length,
     });
     if (!result.canceled) {
-      setImages((p) => [...p, ...result.assets.map((a) => a.uri)].slice(0, 5));
+      const newMedia = result.assets.map((asset) => ({
+        uri: asset.uri,
+        type: (asset.type === "video" ? "video" : "image") as "image" | "video",
+      }));
+      setImages((p) => [...p, ...newMedia].slice(0, 5));
       if (errors.images) setErrors((prev) => ({ ...prev, images: "" }));
     }
   };
@@ -314,6 +354,9 @@ export const RaiseTicketScreen = () => {
   };
 
   const handleSubmit = async () => {
+    // Guard: prevent double-tap from sending a second request
+    if (raiseTicketMutation.isPending) return;
+
     setSubmitAttempted(true);
     const newErrors = validate();
     setErrors(newErrors);
@@ -325,12 +368,18 @@ export const RaiseTicketScreen = () => {
 
     try {
       const formData = new FormData();
+
+      // ── Required fields ──────────────────────────────────────────
       formData.append("categoryId", selectedCat.id);
       formData.append("subCategoryId", selectedSub.id);
-      formData.append("description", `${description}\nNotes: ${imageNotes}`);
+      formData.append("description", imageNotes
+        ? `${description}\n\nImage Notes: ${imageNotes}`
+        : description);
       formData.append("serviceAddress", address);
+      formData.append("priority", "MEDIUM");
 
-      if (preferredDate) {
+      // ── Optional: scheduled date/time ────────────────────────────
+      if (preferredDate && preferredTimeSlot) {
         const scheduledTime = new Date(preferredDate);
         const [timePart] = preferredTimeSlot.split(" - ");
         const [hhmm, ampm] = timePart.split(" ");
@@ -341,12 +390,18 @@ export const RaiseTicketScreen = () => {
         formData.append("scheduledAt", scheduledTime.toISOString());
       }
 
-      images.forEach((uri, idx) => {
-        const filename = uri.split("/").pop() ?? `photo_${idx}.jpg`;
+      // ── Media files — field name must be 'media' (FilesInterceptor) ──
+      images.forEach((item, idx) => {
+        const filename = item.uri.split("/").pop() ?? `media_${idx}.jpg`;
         const ext = filename.split(".").pop()?.toLowerCase() ?? "jpg";
-        const mimeType = ext === "png" ? "image/png" : "image/jpeg";
-        formData.append("images", {
-          uri,
+        let mimeType = "image/jpeg";
+        if (item.type === "video") {
+          mimeType = ext === "mp4" ? "video/mp4" : ext === "mov" ? "video/quicktime" : `video/${ext}`;
+        } else {
+          mimeType = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
+        }
+        formData.append("media", {
+          uri: item.uri,
           name: filename,
           type: mimeType,
         } as any);
@@ -373,7 +428,10 @@ export const RaiseTicketScreen = () => {
     !imageNotes.trim();
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+    >
       <AppHeader showBack onBackPress={() => navigation.goBack()} title="Raise Ticket" />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -565,13 +623,13 @@ export const RaiseTicketScreen = () => {
           </View>
         </AppCard>
 
-        {/* Card 4: Document Photo Attachments */}
+        {/* Card 4: Document Media Attachments */}
         <AppCard style={styles.card}>
-          <Text style={[styles.cardTitle, { color: theme.colors.primary }]}>4. Photo Documentation</Text>
+          <Text style={[styles.cardTitle, { color: theme.colors.primary }]}>4. Media Documentation</Text>
 
           <View style={styles.fieldWrapper}>
             <View style={styles.labelRow}>
-              <Text style={[styles.fieldLabel, { color: theme.colors.textMuted }]}>Upload Issue Photos (At least 1)</Text>
+              <Text style={[styles.fieldLabel, { color: theme.colors.textMuted }]}>Upload Issue Photos/Videos (At least 1)</Text>
               <Text style={{ color: theme.colors.danger, fontWeight: "bold" }}> *</Text>
             </View>
 
@@ -579,10 +637,10 @@ export const RaiseTicketScreen = () => {
             <View style={[styles.uploadBox, { borderColor: theme.colors.border }]}>
               <Upload size={32} color={theme.colors.primary} style={{ marginBottom: 8 }} />
               <Text style={{ fontSize: 13, fontWeight: "700", color: theme.colors.text, marginBottom: 4 }}>
-                Capture or Upload Photos
+                Capture or Upload Media
               </Text>
               <Text style={{ fontSize: 11, color: theme.colors.textMuted, marginBottom: 12 }}>
-                Supports JPG, PNG (Max 5 photos)
+                Supports Photos/Videos (Max 5 items)
               </Text>
               <View style={styles.uploadBoxBtns}>
                 <AppButton title="Take Camera" size="sm" onPress={handlePickFromCamera} style={styles.uploadSubBtn} />
@@ -594,12 +652,17 @@ export const RaiseTicketScreen = () => {
             {images.length > 0 && (
               <View style={{ marginTop: 16 }}>
                 <Text style={{ fontSize: 12, fontWeight: "700", color: theme.colors.textMuted, marginBottom: 10 }}>
-                  Attached Photos ({images.length} of 5)
+                  Attached Media ({images.length} of 5)
                 </Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbnailList}>
-                  {images.map((uri, idx) => (
+                  {images.map((item, idx) => (
                     <View key={idx} style={styles.thumbnailWrapper}>
-                      <Image source={{ uri }} style={styles.thumbImage} />
+                      <Image source={{ uri: item.uri }} style={styles.thumbImage} />
+                      {item.type === "video" && (
+                        <View style={styles.videoOverlay}>
+                          <Play size={20} color="#ffffff" fill="#ffffff" />
+                        </View>
+                      )}
                       <View style={styles.thumbBadge}>
                         <Text style={{ fontSize: 9, color: "#ffffff", fontWeight: "700" }}>#{idx + 1}</Text>
                       </View>
@@ -616,10 +679,10 @@ export const RaiseTicketScreen = () => {
             ) : null}
           </View>
 
-          {/* Image Notes */}
+          {/* Media Notes */}
           <View style={styles.fieldWrapper}>
             <View style={styles.labelRow}>
-              <Text style={[styles.fieldLabel, { color: theme.colors.textMuted }]}>Image notes</Text>
+              <Text style={[styles.fieldLabel, { color: theme.colors.textMuted }]}>Media notes</Text>
               <Text style={{ color: theme.colors.danger, fontWeight: "bold" }}> *</Text>
             </View>
             <AppInput
@@ -640,7 +703,7 @@ export const RaiseTicketScreen = () => {
         <AppButton
           title="Submit Ticket"
           onPress={handleSubmit}
-          disabled={isFormIncomplete}
+          disabled={isFormIncomplete || raiseTicketMutation.isPending}
           loading={raiseTicketMutation.isPending}
           style={styles.submitBtn}
         />
@@ -655,82 +718,246 @@ export const RaiseTicketScreen = () => {
         onConfirm={popupAction}
       />
 
-      {/* Category Picker Modal */}
-      <Modal visible={catModalVisible} transparent animationType="slide" onRequestClose={() => setCatModalVisible(false)}>
+      {/* ── Category Picker Modal (Premium Grid) ── */}
+      <Modal
+        visible={catModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => { setCatModalVisible(false); setCatSearch(""); }}
+      >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: theme.colors.card }]}>
+            {/* Drag handle */}
             <View style={styles.dragHandle} />
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Select Service Category</Text>
-              <Pressable onPress={() => setCatModalVisible(false)}>
-                <X size={20} color={theme.colors.textMuted} />
+
+            {/* Header */}
+            <View style={styles.pickerHeader}>
+              <View>
+                <Text style={[styles.pickerTitle, { color: theme.colors.text }]}>Service Category</Text>
+                <Text style={[styles.pickerSubtitle, { color: theme.colors.textMuted }]}>
+                  {categories.length} categories available
+                </Text>
+              </View>
+              <Pressable
+                style={[styles.pickerCloseBtn, { backgroundColor: `${theme.colors.textMuted}12` }]}
+                onPress={() => { setCatModalVisible(false); setCatSearch(""); }}
+              >
+                <X size={16} color={theme.colors.textMuted} />
               </Pressable>
             </View>
-            <FlatList
-              data={categories}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={{ padding: 16 }}
-              renderItem={({ item }) => (
-                <Pressable
-                  style={[
-                    styles.modalListItemPremium,
-                    selectedCat?.id === item.id && { backgroundColor: `${theme.colors.primary}08`, borderColor: theme.colors.primary },
-                  ]}
-                  onPress={() => {
-                    setSelectedCat(item);
-                    setSelectedSub(null);
-                    setCatModalVisible(false);
-                    if (errors.category) setErrors((prev) => ({ ...prev, category: "" }));
-                  }}
-                >
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-                    <View style={[styles.iconCircleSmall, { backgroundColor: selectedCat?.id === item.id ? `${theme.colors.primary}12` : `${theme.colors.textMuted}08` }]}>
-                      {getCategoryIcon(item.name)}
-                    </View>
-                    <Text style={[styles.modalListText, { color: theme.colors.text, fontWeight: selectedCat?.id === item.id ? "700" : "500" }]}>{item.name}</Text>
-                  </View>
-                  {selectedCat?.id === item.id && <Check size={18} color={theme.colors.primary} />}
+
+            {/* Search bar */}
+            <View style={[styles.pickerSearchBar, { backgroundColor: `${theme.colors.textMuted}08`, borderColor: theme.colors.borderLight }]}>
+              <Settings size={15} color={theme.colors.textMuted} />
+              <TextInput
+                style={[styles.pickerSearchInput, { color: theme.colors.text }]}
+                placeholder="Search categories..."
+                placeholderTextColor={theme.colors.textMuted}
+                value={catSearch}
+                onChangeText={setCatSearch}
+                autoCorrect={false}
+              />
+              {catSearch.length > 0 && (
+                <Pressable onPress={() => setCatSearch("")}>
+                  <X size={14} color={theme.colors.textMuted} />
                 </Pressable>
               )}
+            </View>
+
+            {/* Grid list */}
+            <FlatList
+              data={categories.filter((c: any) =>
+                c.name.toLowerCase().includes(catSearch.toLowerCase())
+              )}
+              keyExtractor={(item) => item.id}
+              numColumns={2}
+              contentContainerStyle={styles.catGrid}
+              columnWrapperStyle={{ gap: 10 }}
+              showsVerticalScrollIndicator={false}
+              ListEmptyComponent={
+                <View style={{ alignItems: "center", paddingVertical: 40 }}>
+                  <Text style={{ color: theme.colors.textMuted, fontSize: 13 }}>No categories found</Text>
+                </View>
+              }
+              renderItem={({ item }) => {
+                const isActive = selectedCat?.id === item.id;
+                const PALETTE = [
+                  { bg: "#fff7ed", icon: "#f97316" },
+                  { bg: "#eff6ff", icon: "#3b82f6" },
+                  { bg: "#f0fdf4", icon: "#22c55e" },
+                  { bg: "#fdf4ff", icon: "#a855f7" },
+                  { bg: "#fff1f2", icon: "#f43f5e" },
+                  { bg: "#f0f9ff", icon: "#0ea5e9" },
+                ];
+                const hash = item.name.charCodeAt(0) % PALETTE.length;
+                const palette = PALETTE[hash];
+                return (
+                  <Pressable
+                    style={[
+                      styles.catGridTile,
+                      { backgroundColor: isActive ? `${theme.colors.primary}0d` : theme.colors.background },
+                      isActive && { borderColor: theme.colors.primary, borderWidth: 2 },
+                      !isActive && { borderColor: theme.colors.borderLight, borderWidth: 1.5 },
+                    ]}
+                    onPress={() => {
+                      setSelectedCat(item);
+                      setSelectedSub(null);
+                      setCatModalVisible(false);
+                      setCatSearch("");
+                      if (errors.category) setErrors((prev) => ({ ...prev, category: "" }));
+                    }}
+                  >
+                    {/* Icon bubble */}
+                    <View style={[styles.catTileIconBubble, { backgroundColor: isActive ? `${theme.colors.primary}18` : palette.bg }]}>
+                      {getCategoryIconEl(
+                        item.name,
+                        isActive ? theme.colors.primary : palette.icon,
+                        26,
+                      )}
+                    </View>
+
+                    {/* Label */}
+                    <Text
+                      style={[styles.catTileLabel, { color: isActive ? theme.colors.primary : theme.colors.text }]}
+                      numberOfLines={2}
+                    >
+                      {item.name}
+                    </Text>
+
+                    {/* Sub count badge */}
+                    {(item._count?.services > 0 || item.services?.length > 0) && (
+                      <View style={[styles.catTileBadge, { backgroundColor: isActive ? theme.colors.primary : `${theme.colors.textMuted}18` }]}>
+                        <Text style={[styles.catTileBadgeText, { color: isActive ? "#fff" : theme.colors.textMuted }]}>
+                          {item._count?.services || item.services?.length} services
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* Selected tick */}
+                    {isActive && (
+                      <View style={[styles.catTileCheck, { backgroundColor: theme.colors.primary }]}>
+                        <Check size={10} color="#fff" />
+                      </View>
+                    )}
+                  </Pressable>
+                );
+              }}
             />
           </View>
         </View>
       </Modal>
 
-      {/* Sub Category Picker Modal */}
-      <Modal visible={subModalVisible} transparent animationType="slide" onRequestClose={() => setSubModalVisible(false)}>
+      {/* ── Sub Category Picker Modal (Premium List) ── */}
+      <Modal
+        visible={subModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => { setSubModalVisible(false); setSubSearch(""); }}
+      >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: theme.colors.card }]}>
             <View style={styles.dragHandle} />
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Select Service Detail</Text>
-              <Pressable onPress={() => setSubModalVisible(false)}>
-                <X size={20} color={theme.colors.textMuted} />
+
+            {/* Header */}
+            <View style={styles.pickerHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.pickerTitle, { color: theme.colors.text }]}>Service Detail</Text>
+                {selectedCat && (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 }}>
+                    <View style={[styles.subHeaderCatDot, { backgroundColor: theme.colors.primary }]} />
+                    <Text style={[styles.pickerSubtitle, { color: theme.colors.primary }]}>{selectedCat.name}</Text>
+                  </View>
+                )}
+              </View>
+              <Pressable
+                style={[styles.pickerCloseBtn, { backgroundColor: `${theme.colors.textMuted}12` }]}
+                onPress={() => { setSubModalVisible(false); setSubSearch(""); }}
+              >
+                <X size={16} color={theme.colors.textMuted} />
               </Pressable>
             </View>
+
+            {/* Search bar */}
+            <View style={[styles.pickerSearchBar, { backgroundColor: `${theme.colors.textMuted}08`, borderColor: theme.colors.borderLight }]}>
+              <Wrench size={15} color={theme.colors.textMuted} />
+              <TextInput
+                style={[styles.pickerSearchInput, { color: theme.colors.text }]}
+                placeholder="Search services..."
+                placeholderTextColor={theme.colors.textMuted}
+                value={subSearch}
+                onChangeText={setSubSearch}
+                autoCorrect={false}
+              />
+              {subSearch.length > 0 && (
+                <Pressable onPress={() => setSubSearch("")}>
+                  <X size={14} color={theme.colors.textMuted} />
+                </Pressable>
+              )}
+            </View>
+
             {isLoadingSubs ? (
-              <AppLoader message="Retrieving repair service details..." />
+              <AppLoader message="Retrieving service details..." />
             ) : (
               <FlatList
-                data={subCategories}
-                keyExtractor={(item) => item.id}
-                contentContainerStyle={{ padding: 16 }}
-                renderItem={({ item }) => (
-                  <Pressable
-                    style={[
-                      styles.modalListItemPremium,
-                      selectedSub?.id === item.id && { backgroundColor: `${theme.colors.primary}08`, borderColor: theme.colors.primary },
-                    ]}
-                    onPress={() => {
-                      setSelectedSub(item);
-                      setSubModalVisible(false);
-                      if (errors.subCategory) setErrors((prev) => ({ ...prev, subCategory: "" }));
-                    }}
-                  >
-                    <Text style={[styles.modalListText, { color: theme.colors.text, fontWeight: selectedSub?.id === item.id ? "700" : "500" }]}>{item.name}</Text>
-                    {selectedSub?.id === item.id && <Check size={18} color={theme.colors.primary} />}
-                  </Pressable>
+                data={subCategories.filter((s: any) =>
+                  s.name.toLowerCase().includes(subSearch.toLowerCase())
                 )}
+                keyExtractor={(item) => item.id}
+                contentContainerStyle={styles.subList}
+                showsVerticalScrollIndicator={false}
+                ListEmptyComponent={
+                  <View style={{ alignItems: "center", paddingVertical: 40 }}>
+                    <Text style={{ color: theme.colors.textMuted, fontSize: 13 }}>No services found</Text>
+                  </View>
+                }
+                renderItem={({ item, index }) => {
+                  const isActive = selectedSub?.id === item.id;
+                  return (
+                    <Pressable
+                      style={[
+                        styles.subListItem,
+                        { backgroundColor: isActive ? `${theme.colors.primary}0a` : theme.colors.background },
+                        isActive
+                          ? { borderColor: theme.colors.primary, borderWidth: 2 }
+                          : { borderColor: theme.colors.borderLight, borderWidth: 1.5 },
+                      ]}
+                      onPress={() => {
+                        setSelectedSub(item);
+                        setSubModalVisible(false);
+                        setSubSearch("");
+                        if (errors.subCategory) setErrors((prev) => ({ ...prev, subCategory: "" }));
+                      }}
+                    >
+                      {/* Left number badge */}
+                      <View style={[styles.subItemNumBadge, { backgroundColor: isActive ? theme.colors.primary : `${theme.colors.textMuted}10` }]}>
+                        <Text style={[styles.subItemNumText, { color: isActive ? "#fff" : theme.colors.textMuted }]}>
+                          {String(index + 1).padStart(2, "0")}
+                        </Text>
+                      </View>
+
+                      {/* Name + charge */}
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.subItemName, { color: isActive ? theme.colors.primary : theme.colors.text }]}>
+                          {item.name}
+                        </Text>
+                        {item.serviceCharges?.length > 0 && (
+                          <Text style={[styles.subItemCharge, { color: theme.colors.textMuted }]}>
+                            ₹{item.serviceCharges[0].amount} base charge
+                          </Text>
+                        )}
+                      </View>
+
+                      {/* Right check */}
+                      {isActive ? (
+                        <View style={[styles.subItemCheckCircle, { backgroundColor: theme.colors.primary }]}>
+                          <Check size={13} color="#fff" />
+                        </View>
+                      ) : (
+                        <ChevronRight size={16} color={theme.colors.textMuted} />
+                      )}
+                    </Pressable>
+                  );
+                }}
               />
             )}
           </View>
@@ -1086,7 +1313,7 @@ export const RaiseTicketScreen = () => {
           </View>
         </View>
       </Modal>
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -1298,6 +1525,13 @@ const styles = StyleSheet.create({
     zIndex: 10,
     elevation: 2,
   },
+  videoOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 8,
+  },
   submitBtn: {
     marginTop: 12,
     marginBottom: 40,
@@ -1356,6 +1590,147 @@ const styles = StyleSheet.create({
   modalListText: {
     fontSize: 14,
     fontWeight: "500",
+  },
+  // ── Premium picker styles ──────────────────────────────────────
+  pickerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 14,
+  },
+  pickerTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    letterSpacing: -0.3,
+  },
+  pickerSubtitle: {
+    fontSize: 12,
+    fontWeight: "500",
+    marginTop: 2,
+  },
+  pickerCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pickerSearchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginHorizontal: 16,
+    marginBottom: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1.5,
+  },
+  pickerSearchInput: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "500",
+    paddingVertical: 0,
+  },
+  // Category grid
+  catGrid: {
+    paddingHorizontal: 16,
+    paddingBottom: 30,
+    gap: 10,
+  },
+  catGridTile: {
+    flex: 1,
+    borderRadius: 16,
+    padding: 14,
+    alignItems: "flex-start",
+    position: "relative",
+    minHeight: 130,
+  },
+  catTileIconBubble: {
+    width: 52,
+    height: 52,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 10,
+  },
+  catTileLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    lineHeight: 18,
+    flex: 1,
+  },
+  catTileBadge: {
+    marginTop: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 20,
+    alignSelf: "flex-start",
+  },
+  catTileBadgeText: {
+    fontSize: 9,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  catTileCheck: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  // Sub category list
+  subList: {
+    paddingHorizontal: 16,
+    paddingBottom: 30,
+    gap: 8,
+  },
+  subListItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+  },
+  subItemNumBadge: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  subItemNumText: {
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  subItemName: {
+    fontSize: 14,
+    fontWeight: "700",
+    lineHeight: 20,
+  },
+  subItemCharge: {
+    fontSize: 11,
+    fontWeight: "500",
+    marginTop: 2,
+  },
+  subItemCheckCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  subHeaderCatDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   modalActionRow: {
     flexDirection: "row",

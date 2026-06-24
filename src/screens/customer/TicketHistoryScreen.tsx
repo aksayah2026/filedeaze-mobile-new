@@ -54,13 +54,17 @@ export const TicketHistoryScreen = () => {
         return { label: "ACCEPTED", variant: "warning" as const };
       case "TRAVELLING":
         return { label: "EN ROUTE", variant: "warning" as const };
+      case "REACHED":
       case "REACHED_LOCATION":
         return { label: "ARRIVED", variant: "warning" as const };
       case "IN_PROGRESS":
         return { label: "IN PROGRESS", variant: "warning" as const };
       case "COMPLETED":
         return { label: "COMPLETED", variant: "success" as const };
+      case "INVOICE_GENERATED":
+        return { label: "INVOICE GENERATED", variant: "success" as const };
       case "TICKET_CLOSED":
+      case "CLOSED":
         return { label: "CLOSED", variant: "success" as const };
       case "CANCELLED":
         return { label: "CANCELLED", variant: "danger" as const };

@@ -20,7 +20,7 @@ export type CustomerStackParamList = {
   RaiseTicket: undefined;
   TicketHistory: undefined;
   CustomerTicketDetails: { ticketId: string };
-  LiveTracking: { ticketId: string; ticketNumber?: string };
+  LiveTracking: { ticketId: string; ticketNumber?: string; hasFeedback?: boolean };
   PaymentHistory: undefined;
   InvoiceList: undefined;
   InvoiceDetails: { invoiceId: string };
@@ -31,6 +31,7 @@ export type CustomerStackParamList = {
 export type TechnicianStackParamList = {
   TechnicianHome: undefined;
   TechnicianJobDetails: { jobId: string };
+  TechnicianInvoiceList: undefined;
   // Batch 1 — List Screens
   AttendanceHistory: undefined;
   AssignedJobs: { initialTab?: "ALL" | "ASSIGNED" | "ACCEPTED" | "IN_PROGRESS" | "PENDING" | "COMPLETED" } | undefined;
@@ -42,9 +43,16 @@ export type TechnicianStackParamList = {
   StartJob: { jobId: string; ticketNo: string };
   MarkPending: { jobId: string; ticketNo: string };
   // Batch 4 — Completion Flow
-  CompleteJob: { jobId: string; ticketNo: string; customerName: string };
+  CompleteJob: { jobId: string; ticketNo: string; customerName: string; startStep?: number };
   CustomerSignature: { jobId: string; ticketNo: string; customerName: string };
   PaymentCollection: { jobId: string; ticketNo: string; amount?: number };
+  // Workflow Integration Screens
+  CheckIn: undefined;
+  CheckOut: undefined;
+  TravelTracking: { jobId: string; ticketNo: string; address: string };
+  WorkTimer: { jobId: string; ticketNo: string };
+  InvoiceGenerate: { jobId: string; ticketNo: string; amount: number; paymentMethod: string; invoiceNo: string; invoiceSubtotal?: number; invoiceGstAmount?: number; invoiceGstPercent?: number; invoiceTotal?: number; invoiceGeneratedAt?: string };
+  ShareInvoice: { jobId: string; ticketNo: string; invoiceNo: string; customerMobile?: string; customerEmail?: string };
 };
 
 export type RootStackParamList = {

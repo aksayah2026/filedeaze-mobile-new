@@ -18,38 +18,37 @@ export class AuthService {
    * Unified Login (tries customer first, falls back to technician)
    */
   static async login(email: string, password: string): Promise<LoginResponse> {
-    try {
+    return new Promise((resolve, reject) => {
+      let resolved = false;
+      let rejectedCount = 0;
+      const errors: any[] = [];
+
+      const handleSuccess = (res: LoginResponse) => {
+        if (!resolved) {
+          resolved = true;
+          resolve(res);
+        }
+      };
+
+      const handleFailure = (err: any) => {
+        rejectedCount++;
+        const errorMessage = err.response?.data?.message || err.message;
+        errors.push(errorMessage);
+        if (rejectedCount === 2 && !resolved) {
+          // Both failed, throw user-friendly error
+          const msg = errors[0] === errors[1] ? errors[0] : `${errors[0]} / ${errors[1]}`;
+          reject(new Error(msg || "Invalid email or password."));
+        }
+      };
+
       // 1. Try customer login
-      const response = await apiClient.post("/auth/customer/login", {
+      apiClient.post("/auth/customer/login", {
         tenantId: APP_CONFIG.tenantId,
         email,
         password,
-      });
-
-      const { user, tokens } = response.data.data;
-      return {
-        success: true,
-        token: tokens.accessToken,
-        user: {
-          id: user.id,
-          name: user.name,
-          mobile: user.phone || "",
-          role: user.role,
-          email: user.email,
-        },
-      };
-    } catch (customerError: any) {
-      // If customer fails, try technician login
-      try {
-        const response = await apiClient.post("/auth/technician/login", {
-          tenantId: APP_CONFIG.tenantId,
-          email,
-          password,
-        });
-
+      }).then((response) => {
         const { user, tokens } = response.data.data;
-        console.log("LOGIN SUCCESS ONLY - no attendance started");
-        return {
+        handleSuccess({
           success: true,
           token: tokens.accessToken,
           user: {
@@ -59,15 +58,33 @@ export class AuthService {
             role: user.role,
             email: user.email,
           },
-        };
-      } catch (techError: any) {
-        const msg =
-          techError.response?.data?.message ||
-          customerError.response?.data?.message ||
-          "Invalid email or password.";
-        throw new Error(msg);
-      }
-    }
+        });
+      }).catch((err) => {
+        handleFailure(err);
+      });
+
+      // 2. Try technician login
+      apiClient.post("/auth/technician/login", {
+        tenantId: APP_CONFIG.tenantId,
+        email,
+        password,
+      }).then((response) => {
+        const { user, tokens } = response.data.data;
+        handleSuccess({
+          success: true,
+          token: tokens.accessToken,
+          user: {
+            id: user.id,
+            name: user.name,
+            mobile: user.phone || "",
+            role: user.role,
+            email: user.email,
+          },
+        });
+      }).catch((err) => {
+        handleFailure(err);
+      });
+    });
   }
 
   /**
