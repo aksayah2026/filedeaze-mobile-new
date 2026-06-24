@@ -6,12 +6,11 @@ import {
   ScrollView,
   Pressable,
   RefreshControl,
-  Modal,
-  Animated,
   Dimensions,
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -20,26 +19,20 @@ import {
   Calendar,
   ChevronRight,
   User,
-  Plus,
   FileText,
   ClipboardList,
   MapPin,
   CreditCard,
-  X,
   Mail,
   Phone,
   Smartphone,
   Building,
   Hash,
-  Menu,
   Edit2,
-  Zap,
-  Wrench,
-  Flame,
-  Hammer,
-  Droplet,
-  Settings,
   Home,
+  Search,
+  Bell,
+  Sparkles,
 } from "lucide-react-native";
 
 import { useTheme } from "../../theme";
@@ -240,53 +233,37 @@ export const CustomerHomeScreen = () => {
     return isProfileLoading;
   };
 
-  const getCatColor = (name: string): { bg: string; icon: string } => {
-    const n = name.toLowerCase();
-    if (n.includes("electrical") || n.includes("power") || n.includes("wire"))
-      return { bg: "#FFF7ED", icon: "#F97316" };
-    if (n.includes("plumb") || n.includes("water") || n.includes("leak"))
-      return { bg: "#EFF6FF", icon: "#3B82F6" };
-    if (n.includes("ac") || n.includes("cool") || n.includes("heat") || n.includes("hvac"))
-      return { bg: "#F0F9FF", icon: "#0EA5E9" };
-    if (n.includes("carpenter") || n.includes("wood") || n.includes("furniture"))
-      return { bg: "#FFFBEB", icon: "#D97706" };
-    if (n.includes("paint"))
-      return { bg: "#FDF4FF", icon: "#A855F7" };
-    if (n.includes("clean"))
-      return { bg: "#ECFDF5", icon: "#10B981" };
-    if (n.includes("home") && !n.includes("appliance"))
-      return { bg: "#FFF1F2", icon: "#F43F5E" };
-    if (n.includes("appliance") || n.includes("repair") || n.includes("fix"))
-      return { bg: "#F0FDF4", icon: "#22C55E" };
-    const PALETTE = [
-      { bg: "#FFF7ED", icon: "#F97316" },
-      { bg: "#EFF6FF", icon: "#3B82F6" },
-      { bg: "#F0FDF4", icon: "#22C55E" },
-      { bg: "#FDF4FF", icon: "#A855F7" },
-      { bg: "#FFF1F2", icon: "#F43F5E" },
-      { bg: "#F0F9FF", icon: "#0EA5E9" },
-    ];
-    return PALETTE[name.charCodeAt(0) % PALETTE.length];
+  const getGreeting = () => {
+    const h = new Date().getHours();
+    if (h < 12) return "Good Morning";
+    if (h < 17) return "Good Afternoon";
+    return "Good Evening";
   };
 
-  const getCategoryIconEl = (name: string, color: string, size: number) => {
+  const SCREEN_W = Dimensions.get("window").width;
+  const CAT_CARD_W = Math.floor((SCREEN_W - 32 - 24) / 3);
+
+  const getCatImage = (name: string): string => {
     const n = name.toLowerCase();
-    if (n.includes("electrical") || n.includes("power") || n.includes("wire")) {
-      return <Zap size={size} color={color} />;
-    }
-    if (n.includes("plumb") || n.includes("water") || n.includes("leak")) {
-      return <Droplet size={size} color={color} />;
-    }
-    if (n.includes("ac") || n.includes("cool") || n.includes("heat") || n.includes("hvac")) {
-      return <Flame size={size} color={color} />;
-    }
-    if (n.includes("carpenter") || n.includes("wood") || n.includes("furniture")) {
-      return <Hammer size={size} color={color} />;
-    }
-    if (n.includes("repair") || n.includes("fix") || n.includes("appliance")) {
-      return <Wrench size={size} color={color} />;
-    }
-    return <Settings size={size} color={color} />;
+    if (n.includes("electrical") || n.includes("power") || n.includes("wire"))
+      return "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=300&h=200&fit=crop";
+    if (n.includes("plumb") || n.includes("water") || n.includes("leak"))
+      return "https://images.unsplash.com/photo-1607400201889-565b1ee75f8e?w=300&h=200&fit=crop";
+    if (n.includes("ac") || n.includes("cool") || n.includes("heat") || n.includes("hvac"))
+      return "https://images.unsplash.com/photo-1585771724684-38269d6639fd?w=300&h=200&fit=crop";
+    if (n.includes("carpenter") || n.includes("wood") || n.includes("furniture"))
+      return "https://images.unsplash.com/photo-1504148455328-c376907d081c?w=300&h=200&fit=crop";
+    if (n.includes("paint"))
+      return "https://images.unsplash.com/photo-1562259929-b4e1fd3aef09?w=300&h=200&fit=crop";
+    if (n.includes("clean"))
+      return "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=300&h=200&fit=crop";
+    if (n.includes("pest"))
+      return "https://images.unsplash.com/photo-1632921522769-8ca3f7c1e4e3?w=300&h=200&fit=crop";
+    if (n.includes("appliance") || n.includes("repair") || n.includes("fix"))
+      return "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=300&h=200&fit=crop";
+    if (n.includes("salon") || n.includes("beauty") || n.includes("spa"))
+      return "https://images.unsplash.com/photo-1560066984-138daaa0ad8a?w=300&h=200&fit=crop";
+    return "https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?w=300&h=200&fit=crop";
   };
 
   return (
@@ -297,55 +274,6 @@ export const CustomerHomeScreen = () => {
         showTenantBranding
         leftAction={null}
       />
-
-      {/* Premium Customer Profile Banner */}
-      <LinearGradient
-        colors={[theme.colors.primary, theme.colors.secondary]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[
-          styles.profileBanner,
-          {
-            paddingBottom: 22,
-            paddingTop: 14,
-            borderBottomLeftRadius: 24,
-            borderBottomRightRadius: 24,
-          },
-        ]}
-      >
-        <View style={[styles.avatarRing, { borderColor: "rgba(255,255,255,0.35)" }]}>
-          <View style={[styles.avatarCircle, { backgroundColor: "rgba(255,255,255,0.22)" }]}>
-            <User color="#ffffff" size={26} />
-          </View>
-        </View>
-        <View style={styles.profileText}>
-          <Text
-            style={[
-              styles.welcomeText,
-              {
-                color: "rgba(255,255,255,0.72)",
-                fontSize: theme.typography.fontSize.xs,
-                textTransform: "uppercase",
-                letterSpacing: 1,
-              },
-            ]}
-          >
-            Customer Account
-          </Text>
-          <Text
-            style={[
-              styles.nameText,
-              {
-                color: "#ffffff",
-                fontSize: theme.typography.fontSize.lg,
-                fontWeight: theme.typography.fontWeight.bold,
-              },
-            ]}
-          >
-            {profile?.name || user?.name || "Customer"}
-          </Text>
-        </View>
-      </LinearGradient>
 
       {/* Reusable Customer Logout Popup */}
       <CustomerPopup
@@ -378,29 +306,101 @@ export const CustomerHomeScreen = () => {
       >
         {activeTab === "HOME" && (
           <View>
-            {/* Service Categories Grid */}
-            <View style={{ marginBottom: 24, paddingHorizontal: theme.spacing.md }}>
-              <Text style={[styles.sectionTitle, { color: theme.colors.textMuted, marginTop: 0 }]}>Select Service Category</Text>
+            {/* Location Bar */}
+            <View style={[styles.locationBar, { backgroundColor: theme.colors.card }]}>
+              <View style={styles.locationLeft}>
+                <MapPin size={16} color={theme.colors.primary} />
+                <View style={{ marginLeft: 8, flex: 1 }}>
+                  <Text style={[styles.locationLabel, { color: theme.colors.textMuted }]}>Your Location</Text>
+                  <Text style={[styles.locationAddr, { color: theme.colors.text }]} numberOfLines={1}>
+                    {profile?.address
+                      ? [profile.address, profile.city].filter(Boolean).join(", ")
+                      : "Set your address"}
+                  </Text>
+                </View>
+              </View>
+              <View style={[styles.locationBellBtn, { backgroundColor: `${theme.colors.primary}14` }]}>
+                <Bell size={19} color={theme.colors.primary} />
+              </View>
+            </View>
+
+            {/* Search Bar */}
+            <View style={[styles.homeSearchWrap, { backgroundColor: theme.colors.card }]}>
+              <View style={[styles.homeSearchBar, { backgroundColor: theme.colors.background, borderColor: theme.colors.borderLight }]}>
+                <Search size={17} color={theme.colors.textLight} />
+                <Text style={[styles.homeSearchPlaceholder, { color: theme.colors.textLight }]}>Search for "Kitchen cleaning"</Text>
+              </View>
+            </View>
+
+            {/* Hero Banner */}
+            <View style={styles.heroBannerWrap}>
+              <LinearGradient
+                colors={["#1E293B", "#0F172A"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.heroBanner}
+              >
+                <View style={styles.heroBannerLeft}>
+                  <Text style={styles.heroBannerTag}>⭐ FEATURED</Text>
+                  <Text style={styles.heroBannerTitle}>Professional{"\n"}Home Services</Text>
+                  <Text style={styles.heroBannerSub}>Trusted experts at{"\n"}your doorstep</Text>
+                  <Pressable
+                    style={[styles.heroBannerBtn, { backgroundColor: theme.colors.primary }]}
+                    onPress={() => categories.length > 0 && navigation.navigate("RaiseTicket", { categoryId: categories[0].id, categoryName: categories[0].name })}
+                  >
+                    <Text style={styles.heroBannerBtnText}>Book Now</Text>
+                  </Pressable>
+                </View>
+                <Image
+                  source={{ uri: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=300&h=260&fit=crop" }}
+                  style={styles.heroBannerImg}
+                  resizeMode="cover"
+                />
+              </LinearGradient>
+            </View>
+
+            {/* Promo Chips */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.promoChipRow}>
+              {[
+                { label: "⚡ Quick Book", color: "#F97316" },
+                { label: "🎁 20% OFF Today", color: "#7C3AED" },
+                { label: "⭐ Top Rated", color: "#0EA5E9" },
+                { label: "✅ Verified Pros", color: "#059669" },
+              ].map((chip, i) => (
+                <View key={i} style={[styles.promoChip, { backgroundColor: `${chip.color}14`, borderColor: `${chip.color}35` }]}>
+                  <Text style={[styles.promoChipText, { color: chip.color }]}>{chip.label}</Text>
+                </View>
+              ))}
+            </ScrollView>
+
+            {/* Services Grid */}
+            <View style={styles.serviceSection}>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={[styles.sectionHeading, { color: theme.colors.text }]}>Explore all services</Text>
+                <Sparkles size={15} color={theme.colors.primary} />
+              </View>
               {isCategoriesLoading ? (
-                <AppLoader message="Loading categories..." />
+                <AppLoader message="Loading..." />
               ) : (
-                <View style={styles.catGrid}>
+                <View style={styles.catGridUC}>
                   {categories.map((cat: any) => (
                     <Pressable
                       key={cat.id}
                       style={({ pressed }) => [
-                        styles.catCard,
-                        { backgroundColor: theme.colors.card, borderColor: theme.colors.borderLight },
-                        pressed && { opacity: 0.88, transform: [{ scale: 0.95 }] }
+                        styles.catCardUC,
+                        { backgroundColor: theme.colors.card, width: CAT_CARD_W },
+                        pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] },
                       ]}
-                      onPress={() => {
-                        navigation.navigate("RaiseTicket", { categoryId: cat.id, categoryName: cat.name });
-                      }}
+                      onPress={() => navigation.navigate("RaiseTicket", { categoryId: cat.id, categoryName: cat.name })}
                     >
-                      <View style={[styles.catIconCircle, { backgroundColor: getCatColor(cat.name).bg }]}>
-                        {getCategoryIconEl(cat.name, getCatColor(cat.name).icon, 28)}
+                      <View style={[styles.catImageWrap, { backgroundColor: theme.colors.background }]}>
+                        <Image
+                          source={{ uri: getCatImage(cat.name) }}
+                          style={styles.catImage}
+                          resizeMode="cover"
+                        />
                       </View>
-                      <Text style={[styles.catName, { color: theme.colors.text }]} numberOfLines={2}>
+                      <Text style={[styles.catNameUC, { color: theme.colors.text }]} numberOfLines={2}>
                         {cat.name}
                       </Text>
                     </Pressable>
@@ -408,11 +408,42 @@ export const CustomerHomeScreen = () => {
                 </View>
               )}
             </View>
+
+            {/* Recent Booking Strip */}
+            {tickets.length > 0 && (
+              <View style={styles.recentSection}>
+                <View style={styles.sectionHeaderRow}>
+                  <Text style={[styles.sectionHeading, { color: theme.colors.text }]}>Recent Booking</Text>
+                  <Pressable onPress={() => setActiveTab("TICKETS")}>
+                    <Text style={[styles.seeAllText, { color: theme.colors.primary }]}>See All</Text>
+                  </Pressable>
+                </View>
+                <AppCard
+                  onPress={() => navigation.navigate("CustomerJobDetails", { jobId: tickets[0].id })}
+                  style={styles.recentCard}
+                >
+                  <View style={styles.cardHeader}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      <ClipboardList size={15} color={theme.colors.textMuted} />
+                      <Text style={[styles.ticketId, { color: theme.colors.textMuted, fontSize: 12 }]}>{tickets[0].ticketNumber}</Text>
+                    </View>
+                    <AppBadge label={getStatusLabel(tickets[0].status)} variant={getStatusVariant(tickets[0].status)} />
+                  </View>
+                  <Text style={[styles.cardTitle, { color: theme.colors.text, fontSize: 15 }]}>
+                    {tickets[0].subCategory?.name || tickets[0].subCategory?.category?.name || "—"}
+                  </Text>
+                  <View style={styles.timeInfo}>
+                    <Calendar size={13} color={theme.colors.textMuted} style={{ marginRight: 5 }} />
+                    <Text style={{ fontSize: 12, color: theme.colors.textMuted }}>{formatDate(tickets[0].createdAt)}</Text>
+                  </View>
+                </AppCard>
+              </View>
+            )}
           </View>
         )}
 
         {activeTab === "TICKETS" && (
-          <View>
+          <View style={{ paddingTop: 16 }}>
 
             <View style={[styles.tabHeader, { paddingHorizontal: theme.spacing.md }]}>
               <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>
@@ -523,7 +554,7 @@ export const CustomerHomeScreen = () => {
         )}
 
         {activeTab === "INVOICES" && (
-          <View>
+          <View style={{ paddingTop: 16 }}>
             {isInvoicesLoading ? (
               <AppLoader message="Retrieving invoices..." />
             ) : invoices.length === 0 ? (
@@ -622,7 +653,7 @@ export const CustomerHomeScreen = () => {
         )}
 
         {activeTab === "PAYMENTS" && (
-          <View>
+          <View style={{ paddingTop: 16 }}>
             {isPaymentsLoading ? (
               <AppLoader message="Retrieving transactions..." />
             ) : payments.length === 0 ? (
@@ -752,7 +783,7 @@ export const CustomerHomeScreen = () => {
         {activeTab === "PROFILE" && (
           <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : "height"}
-            style={{ flex: 1 }}
+            style={{ flex: 1, paddingTop: 16 }}
           >
             <AppCard style={styles.formCard}>
               <View
@@ -976,68 +1007,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  logoutButton: {
-    padding: 8,
-    borderRadius: 8,
-  },
-  profileBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    shadowColor: "rgba(79,111,232,0.3)",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 1,
-    shadowRadius: 14,
-    elevation: 6,
-    marginBottom: 8,
-  },
-  avatarRing: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    borderWidth: 2,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 14,
-  },
-  avatarCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  bannerRaiseBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 11,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  bannerRaiseBtnText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#ffffff",
-    letterSpacing: 0.3,
-  },
-  profileText: {
-    flex: 1,
-  },
-  welcomeText: {
-    textTransform: "uppercase",
-    letterSpacing: 1,
-    marginBottom: 4,
-    fontWeight: "600",
-  },
-  nameText: {
-    letterSpacing: 0.5,
-  },
   scrollContent: {
-    paddingTop: 16,
+    paddingTop: 0,
     paddingBottom: 40,
   },
   tabHeader: {
@@ -1122,136 +1093,12 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-  topRaiseTicketBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    alignSelf: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  topRaiseTicketText: {
-    fontSize: 13,
-    fontWeight: "700",
-    letterSpacing: 0.3,
-  },
-  drawerOverlay: {
-    flex: 1,
-    flexDirection: "row",
-  },
-  backdropPressable: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-  },
-  drawerContent: {
-    height: "100%",
-    shadowColor: "#000",
-    shadowOffset: { width: 4, height: 0 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 16,
-    borderTopRightRadius: 24,
-    borderBottomRightRadius: 24,
-    overflow: "hidden",
-  },
-  drawerHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === "ios" ? 60 : 30,
-    paddingBottom: 20,
-    borderBottomWidth: 1,
-  },
-  drawerAvatarCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  drawerTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-    letterSpacing: 0.5,
-  },
-  closeBtn: {
-    padding: 8,
-    backgroundColor: "rgba(0,0,0,0.04)",
-    borderRadius: 20,
-  },
-  drawerScroll: {
-    flex: 1,
-  },
-  drawerScrollContent: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  drawerSection: {
-    gap: 12,
-  },
   drawerSectionTitle: {
     fontSize: 12,
     fontWeight: "800",
     textTransform: "uppercase",
     letterSpacing: 1,
     marginBottom: 12,
-  },
-  addressBookItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 12,
-    borderRadius: 8,
-    marginVertical: 8,
-  },
-  addressBookText: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  menuContainer: {
-    flex: 1,
-    justifyContent: "space-between",
-  },
-  menuItemRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-  },
-  menuItemLabel: {
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  drawerFooter: {
-    padding: 20,
-    borderTopWidth: 1,
-  },
-  drawerLogoutBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    borderRadius: 12,
-    paddingVertical: 14,
-    width: "100%",
-  },
-  drawerLogoutText: {
-    fontSize: 15,
-    fontWeight: "700",
-    letterSpacing: 0.5,
   },
   formCard: {
     padding: 20,
@@ -1302,40 +1149,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
   },
-  catGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  catCard: {
-    width: "48%",
-    borderRadius: 16,
-    padding: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    shadowColor: "rgba(15,23,42,0.07)",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 1,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  catIconCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 12,
-  },
-  catName: {
-    fontSize: 13,
-    fontWeight: "700",
-    textAlign: "center",
-    letterSpacing: 0.1,
-    lineHeight: 18,
-  },
   bottomNav: {
     flexDirection: "row",
     justifyContent: "space-around",
@@ -1379,6 +1192,185 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700",
     letterSpacing: 0.5,
+  },
+  locationBar: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "space-between" as const,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(0,0,0,0.05)",
+  },
+  locationLeft: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    flex: 1,
+  },
+  locationLabel: {
+    fontSize: 11,
+    fontWeight: "500" as const,
+    marginBottom: 2,
+  },
+  locationAddr: {
+    fontSize: 13,
+    fontWeight: "700" as const,
+    maxWidth: 220,
+  },
+  locationBellBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+  },
+  homeSearchWrap: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  homeSearchBar: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    gap: 10,
+  },
+  homeSearchPlaceholder: {
+    fontSize: 14,
+    flex: 1,
+  },
+  heroBannerWrap: {
+    paddingHorizontal: 16,
+    marginBottom: 14,
+  },
+  heroBanner: {
+    borderRadius: 18,
+    overflow: "hidden" as const,
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    paddingLeft: 20,
+    paddingVertical: 20,
+    minHeight: 155,
+  },
+  heroBannerLeft: {
+    flex: 1,
+    paddingRight: 10,
+  },
+  heroBannerTag: {
+    fontSize: 10,
+    color: "rgba(255,255,255,0.60)",
+    fontWeight: "700" as const,
+    letterSpacing: 1.2,
+    textTransform: "uppercase" as const,
+    marginBottom: 6,
+  },
+  heroBannerTitle: {
+    fontSize: 19,
+    fontWeight: "800" as const,
+    color: "#ffffff",
+    lineHeight: 26,
+    marginBottom: 5,
+  },
+  heroBannerSub: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.65)",
+    lineHeight: 18,
+    marginBottom: 14,
+  },
+  heroBannerBtn: {
+    alignSelf: "flex-start" as const,
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    borderRadius: 22,
+  },
+  heroBannerBtnText: {
+    fontSize: 13,
+    fontWeight: "700" as const,
+    color: "#ffffff",
+  },
+  heroBannerImg: {
+    width: 120,
+    height: 140,
+    borderRadius: 12,
+  },
+  promoChipRow: {
+    paddingHorizontal: 16,
+    gap: 8,
+    paddingBottom: 16,
+  },
+  promoChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  promoChipText: {
+    fontSize: 12,
+    fontWeight: "700" as const,
+    letterSpacing: 0.1,
+  },
+  serviceSection: {
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  sectionHeaderRow: {
+    flexDirection: "row" as const,
+    justifyContent: "space-between" as const,
+    alignItems: "center" as const,
+    marginBottom: 14,
+  },
+  sectionHeading: {
+    fontSize: 16,
+    fontWeight: "800" as const,
+    letterSpacing: 0.1,
+  },
+  seeAllText: {
+    fontSize: 13,
+    fontWeight: "700" as const,
+  },
+  catGridUC: {
+    flexDirection: "row" as const,
+    flexWrap: "wrap" as const,
+    gap: 12,
+  },
+  catCardUC: {
+    borderRadius: 14,
+    overflow: "hidden" as const,
+    alignItems: "center" as const,
+    paddingBottom: 10,
+    shadowColor: "rgba(15,23,42,0.09)",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  catImageWrap: {
+    width: "100%",
+    height: 90,
+    overflow: "hidden" as const,
+  },
+  catImage: {
+    width: "100%",
+    height: "100%",
+  },
+  catNameUC: {
+    fontSize: 11.5,
+    fontWeight: "700" as const,
+    textAlign: "center" as const,
+    paddingHorizontal: 6,
+    marginTop: 8,
+    lineHeight: 16,
+  },
+  recentSection: {
+    marginTop: 20,
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  recentCard: {
+    borderRadius: 16,
+    padding: 16,
   },
 });
 
