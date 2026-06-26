@@ -83,7 +83,7 @@ export const MarkPendingScreen = () => {
       Alert.alert(
         "Marked as Pending",
         `Ticket ${ticketNo} has been marked as Pending.\nReason: ${selectedReason}`,
-        [{ text: "OK", onPress: () => navigation.navigate("TechnicianHome") }]
+        [{ text: "OK", onPress: () => navigation.navigate("TechnicianJobDetails", { jobId }) }]
       );
     } catch (err: any) {
       Alert.alert("Error", err.message || "Failed to mark as pending.");

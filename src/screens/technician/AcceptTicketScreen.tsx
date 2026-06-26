@@ -69,7 +69,7 @@ export const AcceptTicketScreen = () => {
 
     // 1. Check if the technician already has another active job
     const hasActiveJob = Array.isArray(allJobs) && allJobs.some(
-      (j) => j.id !== jobId && ["ACCEPTED", "TRAVELLING", "REACHED", "IN_PROGRESS", "PENDING", "RESCHEDULED", "INVOICE_GENERATED", "COMPLETED"].includes(j.status)
+      (j) => j.id !== jobId && ["ACCEPTED", "TRAVELLING", "REACHED", "IN_PROGRESS", "RESCHEDULED", "INVOICE_GENERATED", "COMPLETED"].includes(j.status)
     );
     if (hasActiveJob) {
       setAlertModalTitle("Active Job Pending");

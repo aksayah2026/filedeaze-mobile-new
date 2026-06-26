@@ -1,3 +1,4 @@
+import React, { useContext } from "react";
 import { APP_CONFIG } from "../config/app.config";
 
 export interface ThemeColors {
@@ -78,6 +79,25 @@ export const DEFAULT_THEME_COLORS: ThemeColors = {
   amber: "#F59E0B",
 };
 
+// Teal theme for technician portal — premium, refreshing look
+export const TECHNICIAN_THEME_COLORS: ThemeColors = {
+  primary: "#1883a3",
+  secondary: "#4eb9d4c5",
+  success: "#16b910",
+  warning: "#F59E0B",
+  danger: "#EF4444",
+  background: "#f0fbfd",
+  card: "#FFFFFF",
+  text: "#0F172A",
+  textMuted: "#475569",
+  textLight: "#94A3B8",
+  border: "#2d928a",
+  borderLight: "#fbcecc",
+  shadow: "rgba(13, 148, 136, 0.08)",
+  purple: "#7C3AED",
+  amber: "#F59E0B",
+};
+
 export const SPACING: Spacing = {
   xs: 4,
   sm: 8,
@@ -122,9 +142,20 @@ export const theme: AppTheme = {
   borderRadius: BORDER_RADIUS,
 };
 
-/**
- * Hook to retrieve the current active theme.
- */
+export const technicianTheme: AppTheme = {
+  colors: TECHNICIAN_THEME_COLORS,
+  spacing: SPACING,
+  typography: TYPOGRAPHY,
+  borderRadius: BORDER_RADIUS,
+};
+
+const ThemeContext = React.createContext<AppTheme>(theme);
+
+export const ThemeProvider: React.FC<{ theme: AppTheme; children: React.ReactNode }> = ({
+  theme: themeValue,
+  children,
+}) => React.createElement(ThemeContext.Provider, { value: themeValue }, children);
+
 export function useTheme(): AppTheme {
-  return theme;
+  return useContext(ThemeContext);
 }

@@ -61,7 +61,15 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             source={{ uri: (APP_CONFIG as any).logo }}
             style={[styles.logo, { borderColor: theme.colors.borderLight }]}
           />
-        ) : null}
+        ) : showTenantBranding ? (
+          <View style={[styles.initialsLogo, { backgroundColor: theme.colors.primary }]}>
+            <Text style={styles.initialsText}>
+              {APP_CONFIG.appName.split(" ").slice(0, 2).map((w: string) => w[0]).join("")}
+            </Text>
+          </View>
+        ) : (
+          <View style={{ width: 40 }} />
+        )}
 
         <View style={styles.textContainer}>
           {showTenantBranding && !title ? (
@@ -157,20 +165,25 @@ const styles = StyleSheet.create({
   textContainer: {
     flex: 1,
     justifyContent: "center",
+    alignItems: "center",
   },
   title: {
     letterSpacing: -0.2,
+    textAlign: "center",
   },
   subtitle: {
     marginTop: 1,
+    textAlign: "center",
   },
   tenantTitle: {
     letterSpacing: -0.2,
+    textAlign: "center",
   },
   tenantSubtitle: {
     marginTop: 1,
     letterSpacing: 0.2,
     textTransform: "uppercase",
+    textAlign: "center",
   },
   rightActionContainer: {
     justifyContent: "center",
@@ -179,6 +192,19 @@ const styles = StyleSheet.create({
   },
   rightActionPlaceholder: {
     width: 40,
+  },
+  initialsLogo: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  initialsText: {
+    color: "#ffffff",
+    fontSize: 13,
+    fontWeight: "800",
+    letterSpacing: 0.5,
   },
   leftActionContainer: {
     justifyContent: "center",

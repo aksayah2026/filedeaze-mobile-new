@@ -105,6 +105,7 @@ export interface CustomerTicketDetail {
     rating: number;
     review: string;
   } | null;
+  cancelReason?: string | null;
 }
 
 export interface CustomerPayment {

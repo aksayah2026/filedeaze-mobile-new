@@ -132,6 +132,10 @@ export const RaiseTicketScreen = () => {
   const [popupMessage, setPopupMessage] = useState("");
   const [popupAction, setPopupAction] = useState<() => void>(() => {});
 
+  // Success countdown states
+  const [successVisible, setSuccessVisible] = useState(false);
+  const [countdown, setCountdown] = useState(5);
+
   // Validation / Error states
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitAttempted, setSubmitAttempted] = useState(false);
@@ -262,7 +266,6 @@ export const RaiseTicketScreen = () => {
     }
     if (!address.trim()) newErrors.address = "Address is required";
     if (images.length === 0) newErrors.images = "At least 1 photo or video is required";
-    if (!imageNotes.trim()) newErrors.imageNotes = "Media notes are required";
     return newErrors;
   };
 
@@ -279,6 +282,24 @@ export const RaiseTicketScreen = () => {
     if (!result.canceled && result.assets[0]) {
       const asset = result.assets[0];
       setImages((p) => [...p, { uri: asset.uri, type: (asset.type === "video" ? "video" : "image") as "image" | "video" }]);
+      if (errors.images) setErrors((prev) => ({ ...prev, images: "" }));
+    }
+  };
+
+  const handleRecordVideo = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      triggerPopup("warning", "Permission Required", "Camera access is needed to record video.");
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+      quality: 0.7,
+      videoMaxDuration: 60,
+    });
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      setImages((p) => [...p, { uri: asset.uri, type: "video" }]);
       if (errors.images) setErrors((prev) => ({ ...prev, images: "" }));
     }
   };
@@ -428,10 +449,19 @@ export const RaiseTicketScreen = () => {
       });
 
       await raiseTicketMutation.mutateAsync(formData);
-      triggerPopup("success", "Ticket Raised", "Your support request has been logged successfully!", () => {
-        setPopupVisible(false);
-        navigation.navigate("CustomerHome");
-      });
+      setSuccessVisible(true);
+      setCountdown(5);
+      const interval = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            setSuccessVisible(false);
+            navigation.navigate("CustomerHome");
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
     } catch (err: any) {
       triggerPopup("danger", "Submission Error", err?.message || "Failed to raise support ticket");
     }
@@ -444,8 +474,7 @@ export const RaiseTicketScreen = () => {
     !preferredDate ||
     !preferredTimeSlot ||
     !address.trim() ||
-    images.length === 0 ||
-    !imageNotes.trim();
+    images.length === 0;
 
   return (
     <KeyboardAvoidingView
@@ -533,6 +562,44 @@ export const RaiseTicketScreen = () => {
             {submitAttempted && errors.subCategory ? (
               <Text style={[styles.errorText, { color: theme.colors.danger }]}>{errors.subCategory}</Text>
             ) : null}
+            {selectedSub && (
+              <View style={[styles.priceNoteBox, { backgroundColor: theme.colors.card, borderColor: `${theme.colors.primary}20` }]}>
+                <Text style={{ fontSize: 12, fontWeight: "800", color: theme.colors.textMuted, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
+                  Estimated Price Breakdown
+                </Text>
+                {selectedSub.serviceCharges?.length > 0 ? (() => {
+                  const base = Number(selectedSub.serviceCharges[0].amount) || 0;
+                  const gstPct = Number(selectedSub.serviceCharges[0].gstPercent ?? 18);
+                  const gstAmt = Math.round(base * gstPct / 100);
+                  const total = base + gstAmt;
+                  return (
+                    <>
+                      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
+                        <Text style={{ fontSize: 13, color: theme.colors.textMuted }}>Service Charge</Text>
+                        <Text style={{ fontSize: 13, fontWeight: "700", color: theme.colors.text }}>₹{base}</Text>
+                      </View>
+                      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
+                        <Text style={{ fontSize: 13, color: theme.colors.textMuted }}>GST ({gstPct}%)</Text>
+                        <Text style={{ fontSize: 13, fontWeight: "700", color: theme.colors.text }}>₹{gstAmt}</Text>
+                      </View>
+                      <View style={{ height: 1, backgroundColor: theme.colors.borderLight, marginBottom: 8 }} />
+                      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 10 }}>
+                        <Text style={{ fontSize: 14, fontWeight: "800", color: theme.colors.text }}>Total Estimated</Text>
+                        <Text style={{ fontSize: 14, fontWeight: "800", color: theme.colors.primary }}>₹{total}</Text>
+                      </View>
+                    </>
+                  );
+                })() : (
+                  <Text style={{ fontSize: 13, color: theme.colors.textMuted, marginBottom: 10 }}>Price to be confirmed after inspection</Text>
+                )}
+                <View style={{ backgroundColor: `${theme.colors.warning}12`, borderRadius: 8, padding: 8, flexDirection: "row", gap: 6 }}>
+                  <Text style={{ fontSize: 10 }}>⚠️</Text>
+                  <Text style={{ fontSize: 11, color: theme.colors.textMuted, flex: 1, lineHeight: 16 }}>
+                    Disclaimer: This is an approximate estimate. The final price may differ after on-site inspection or if additional work is required.
+                  </Text>
+                </View>
+              </View>
+            )}
           </View>
 
           {/* Description */}
@@ -610,9 +677,15 @@ export const RaiseTicketScreen = () => {
                     setTempMin(mm || 0);
                     setTempPeriod(periodPart || "AM");
                   } else {
-                    setTempHour(8);
-                    setTempMin(0);
-                    setTempPeriod("AM");
+                    const now = new Date();
+                    let currentH = now.getHours();
+                    const currentM = Math.ceil(now.getMinutes() / 5) * 5;
+                    const period: "AM" | "PM" = currentH >= 12 ? "PM" : "AM";
+                    if (currentH > 12) currentH -= 12;
+                    if (currentH === 0) currentH = 12;
+                    setTempHour(currentH);
+                    setTempMin(currentM >= 60 ? 55 : currentM);
+                    setTempPeriod(period);
                   }
                   setTimeModalVisible(true);
                 }}
@@ -645,27 +718,25 @@ export const RaiseTicketScreen = () => {
               <Text style={[styles.fieldLabel, { color: theme.colors.textMuted }]}>Service Address</Text>
               <Text style={{ color: theme.colors.danger, fontWeight: "bold" }}> *</Text>
             </View>
-            <View style={styles.addressInputRow}>
-              <View style={{ flex: 1 }}>
-                <AppInput
-                  placeholder="Enter full location address details..."
-                  value={address}
-                  onChangeText={(val) => {
-                    setAddress(val);
-                    if (errors.address) setErrors((prev) => ({ ...prev, address: "" }));
-                  }}
-                  multiline
-                  numberOfLines={2}
-                />
-              </View>
-              <Pressable
-                style={[styles.addressBookBtn, { backgroundColor: theme.colors.background, borderColor: theme.colors.borderLight }]}
-                onPress={handleOpenAddressBook}
-              >
-                <MapPin size={20} color={theme.colors.primary} />
-                <Text style={[styles.addressBookLabel, { color: theme.colors.primary }]}>Address Book</Text>
-              </Pressable>
-            </View>
+            <AppInput
+              placeholder="Enter full location address details..."
+              value={address}
+              onChangeText={(val) => {
+                setAddress(val);
+                if (errors.address) setErrors((prev) => ({ ...prev, address: "" }));
+              }}
+              multiline
+              numberOfLines={3}
+            />
+            <Pressable
+              style={[styles.addressBookBtnFull, { backgroundColor: `${theme.colors.primary}08`, borderColor: `${theme.colors.primary}40` }]}
+              onPress={handleOpenAddressBook}
+            >
+              <MapPin size={16} color={theme.colors.primary} />
+              <Text style={{ color: theme.colors.primary, fontSize: 13, fontWeight: "700", marginLeft: 8 }}>
+                Pick from Address Book
+              </Text>
+            </Pressable>
             {submitAttempted && errors.address ? (
               <Text style={[styles.errorText, { color: theme.colors.danger }]}>{errors.address}</Text>
             ) : null}
@@ -697,8 +768,9 @@ export const RaiseTicketScreen = () => {
                 Supports Photos/Videos (Max 5 items)
               </Text>
               <View style={styles.uploadBoxBtns}>
-                <AppButton title="Take Camera" size="sm" onPress={handlePickFromCamera} style={styles.uploadSubBtn} />
-                <AppButton title="From Gallery" size="sm" variant="outline" onPress={handlePickFromGallery} style={styles.uploadSubBtn} />
+                <AppButton title="Camera" size="sm" onPress={handlePickFromCamera} style={styles.uploadSubBtn} />
+                <AppButton title="Gallery" size="sm" variant="outline" onPress={handlePickFromGallery} style={styles.uploadSubBtn} />
+                <AppButton title="Record Video" size="sm" variant="outline" onPress={handleRecordVideo} style={styles.uploadSubBtn} />
               </View>
             </View>
 
@@ -737,19 +809,13 @@ export const RaiseTicketScreen = () => {
           <View style={styles.fieldWrapper}>
             <View style={styles.labelRow}>
               <Text style={[styles.fieldLabel, { color: theme.colors.textMuted }]}>Media notes</Text>
-              <Text style={{ color: theme.colors.danger, fontWeight: "bold" }}> *</Text>
+              <Text style={{ color: theme.colors.textMuted, fontSize: 10, fontWeight: "500", marginLeft: 4 }}>(Optional)</Text>
             </View>
             <AppInput
               placeholder="e.g. Model number sticker / leak spot near the pipe joint"
               value={imageNotes}
-              onChangeText={(val) => {
-                setImageNotes(val);
-                if (errors.imageNotes) setErrors((prev) => ({ ...prev, imageNotes: "" }));
-              }}
+              onChangeText={setImageNotes}
             />
-            {submitAttempted && errors.imageNotes ? (
-              <Text style={[styles.errorText, { color: theme.colors.danger }]}>{errors.imageNotes}</Text>
-            ) : null}
           </View>
         </AppCard>
 
@@ -764,6 +830,27 @@ export const RaiseTicketScreen = () => {
           />
         </View>
       </ScrollView>
+
+      {/* Success countdown Modal */}
+      <Modal visible={successVisible} transparent animationType="fade">
+        <View style={styles.centeredModalOverlay}>
+          <View style={[styles.centeredModalContent, { backgroundColor: theme.colors.card, padding: 28, alignItems: "center" }]}>
+            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: `${theme.colors.success}15`, alignItems: "center", justifyContent: "center", marginBottom: 16 }}>
+              <Check size={32} color={theme.colors.success} />
+            </View>
+            <Text style={{ fontSize: 18, fontWeight: "800", color: theme.colors.text, marginBottom: 8 }}>Ticket Raised!</Text>
+            <Text style={{ fontSize: 13, color: theme.colors.textMuted, textAlign: "center", lineHeight: 20, marginBottom: 20 }}>
+              Your support request has been logged successfully. Our team will get back to you shortly.
+            </Text>
+            <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: `${theme.colors.primary}12`, alignItems: "center", justifyContent: "center" }}>
+              <Text style={{ fontSize: 22, fontWeight: "800", color: theme.colors.primary }}>{countdown}</Text>
+            </View>
+            <Text style={{ fontSize: 11, color: theme.colors.textMuted, marginTop: 6 }}>
+              Redirecting to Home in {countdown}s...
+            </Text>
+          </View>
+        </View>
+      </Modal>
 
       {/* Reusable Customer Popup Dialog */}
       <CustomerPopup
@@ -1004,12 +1091,10 @@ export const RaiseTicketScreen = () => {
                       </View>
 
                       {/* Right check */}
-                      {isActive ? (
+                      {isActive && (
                         <View style={[styles.subItemCheckCircle, { backgroundColor: theme.colors.primary }]}>
                           <Check size={13} color="#fff" />
                         </View>
-                      ) : (
-                        <ChevronRight size={16} color={theme.colors.textMuted} />
                       )}
                     </Pressable>
                   );
@@ -1339,9 +1424,9 @@ export const RaiseTicketScreen = () => {
       </Modal>
 
       {/* Add/Edit Address Form Modal */}
-      <Modal visible={addressFormVisible} transparent animationType="slide" onRequestClose={() => setAddressFormVisible(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: theme.colors.card, maxHeight: "80%", paddingBottom: 24 }]}>
+      <Modal visible={addressFormVisible} transparent animationType="fade" onRequestClose={() => setAddressFormVisible(false)}>
+        <View style={styles.centeredModalOverlay}>
+          <View style={[styles.centeredModalContent, { backgroundColor: theme.colors.card }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
                 {addressForm.id ? "Edit Address" : "Add Address"}
@@ -1563,11 +1648,39 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  addressBookBtnFull: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1.5,
+  },
+  centeredModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+  },
+  centeredModalContent: {
+    width: "100%",
+    borderRadius: 20,
+    maxHeight: "75%",
+    overflow: "hidden",
+  },
   addressBookLabel: {
     fontSize: 9,
     fontWeight: "700",
     marginTop: 4,
     textAlign: "center",
+  },
+  priceNoteBox: {
+    marginTop: 8,
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
   },
   uploadBox: {
     borderWidth: 1.5,
@@ -1579,11 +1692,14 @@ const styles = StyleSheet.create({
   },
   uploadBoxBtns: {
     flexDirection: "row",
-    gap: 10,
+    flexWrap: "wrap",
+    gap: 8,
     width: "100%",
+    justifyContent: "center",
   },
   uploadSubBtn: {
     flex: 1,
+    minWidth: 90,
     height: 40,
     borderRadius: 8,
   },

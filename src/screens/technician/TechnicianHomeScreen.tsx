@@ -11,6 +11,7 @@ import {
   ScrollView,
   RefreshControl,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
@@ -28,6 +29,7 @@ import {
   Timer,
   Calendar,
   Receipt,
+  Briefcase,
 } from "lucide-react-native";
 
 import { useTheme } from "../../theme";
@@ -35,7 +37,6 @@ import { useAuthStore } from "../../store/auth.store";
 import { useTechnicianJobs, useTechnicianInvoices, useAttendanceStatus, useCheckIn, useCheckOut } from "../../hooks/useJobs";
 import { TicketStatus } from "../../services/job.service";
 import { TechnicianStackParamList } from "../../types/navigation.types";
-import { AppHeader } from "../../components/AppHeader";
 import { AppLoader } from "../../components/AppLoader";
 import { AppEmptyState } from "../../components/AppEmptyState";
 import { AppCard } from "../../components/AppCard";
@@ -53,8 +54,17 @@ type NavigationProp = NativeStackNavigationProp<TechnicianStackParamList, "Techn
 
 export const TechnicianHomeScreen = () => {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation<NavigationProp>();
   const { user, logout } = useAuthStore();
+
+  const getGreeting = () => {
+    const h = new Date().getHours();
+    if (h < 12) return "Good Morning";
+    if (h < 17) return "Good Afternoon";
+    return "Good Evening";
+  };
+  const firstName = user?.name?.split(" ")[0] || user?.name || "Technician";
   const { data: jobs = [], isLoading: isJobsLoading, isError, error, refetch, isRefetching } = useTechnicianJobs();
   const { data: invoices = [], isLoading: isInvoicesLoading, refetch: refetchInvoices, isRefetching: isRefetchingInvoices } = useTechnicianInvoices();
   const { data: attendance, isLoading: isAttendanceLoading } = useAttendanceStatus();
@@ -300,62 +310,77 @@ export const TechnicianHomeScreen = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <AppHeader
-        showTenantBranding
-        rightAction={
-          <Pressable
-            onPress={() => setLogoutModalVisible(true)}
-            style={({ pressed }) => [styles.logoutButton, pressed && { opacity: 0.7 }]}
-          >
-            <LogOut color={theme.colors.danger} size={20} />
-          </Pressable>
-        }
-      />
-
-      {/* Technician Banner */}
+      {/* Hero Section */}
       <View
         style={[
-          styles.profileBanner,
-          {
-            backgroundColor: theme.colors.card,
-            borderBottomWidth: 1,
-            borderBottomColor: theme.colors.borderLight,
-          },
+          styles.heroSection,
+          { backgroundColor: theme.colors.primary, paddingTop: insets.top + 16 },
         ]}
       >
-        <View style={[styles.avatarCircle, { backgroundColor: `${theme.colors.primary}15` }]}>
-          <User color={theme.colors.primary} size={24} />
+        {/* Top Row: Avatar + Name + Actions */}
+        <View style={styles.heroTopRow}>
+          <View style={[styles.heroAvatar, { backgroundColor: "rgba(255,255,255,0.2)" }]}>
+            <User color="#ffffff" size={22} />
+          </View>
+          <View style={styles.heroInfo}>
+            <Text style={styles.heroDashLabel}>TECHNICIAN DASHBOARD</Text>
+            <Text style={styles.heroName}>{getGreeting()}, {firstName}!</Text>
+            <Text style={styles.heroMobile}>{user?.mobile}</Text>
+          </View>
+          <View style={styles.heroActions}>
+            <Pressable
+              onPress={() => navigation.navigate("AttendanceHistory")}
+              style={({ pressed }) => [styles.heroActionBtn, pressed && { opacity: 0.7 }]}
+            >
+              <History color="#ffffff" size={18} />
+            </Pressable>
+            <Pressable
+              onPress={() => setLogoutModalVisible(true)}
+              style={({ pressed }) => [styles.heroActionBtn, pressed && { opacity: 0.7 }]}
+            >
+              <LogOut color="rgba(255,255,255,0.85)" size={18} />
+            </Pressable>
+          </View>
         </View>
-        <View style={styles.profileText}>
-          <Text style={[styles.welcomeText, { color: theme.colors.textMuted, fontSize: theme.typography.fontSize.xs }]}>
-            Technician Dashboard
-          </Text>
-          <Text
+
+        {/* Bottom Row: Status pill + Job count */}
+        <View style={styles.heroBottomRow}>
+          <View
             style={[
-              styles.nameText,
+              styles.heroStatusPill,
               {
-                color: theme.colors.text,
-                fontSize: theme.typography.fontSize.md,
-                fontWeight: theme.typography.fontWeight.semibold,
+                backgroundColor: attendance?.checkedIn
+                  ? "rgba(255,255,255,0.18)"
+                  : "rgba(0,0,0,0.18)",
               },
             ]}
           >
-            {user?.name} ({user?.mobile})
-          </Text>
+            <View
+              style={[
+                styles.heroStatusDot,
+                {
+                  backgroundColor: attendance?.shiftCompleted
+                    ? "#facc15"
+                    : attendance?.checkedIn
+                    ? "#4ade80"
+                    : "rgba(255,255,255,0.4)",
+                },
+              ]}
+            />
+            <Text style={styles.heroStatusText}>
+              {attendance?.shiftCompleted
+                ? "Shift Completed Today"
+                : attendance?.checkedIn
+                ? `Active · Since ${attendance.checkInTime}`
+                : "Not Checked In"}
+            </Text>
+          </View>
+
+          <View style={[styles.heroJobBadge, { backgroundColor: "rgba(255,255,255,0.18)" }]}>
+            <Text style={styles.heroJobNum}>{assignedCount + inProgressCount + pendingCount}</Text>
+            <Text style={styles.heroJobLabel}>Pending</Text>
+          </View>
         </View>
-        <Pressable
-          onPress={() => navigation.navigate("AttendanceHistory")}
-          style={({ pressed }) => [
-            {
-              padding: 8,
-              borderRadius: 8,
-              backgroundColor: `${theme.colors.primary}12`,
-            },
-            pressed && { opacity: 0.7 },
-          ]}
-        >
-          <History color={theme.colors.primary} size={20} />
-        </Pressable>
       </View>
 
       <ScrollView
@@ -374,7 +399,7 @@ export const TechnicianHomeScreen = () => {
         }
       >
         {/* Attendance Card */}
-        <AppCard style={styles.attendanceCard}>
+        <AppCard style={[styles.attendanceCard, { borderTopWidth: 3, borderTopColor: theme.colors.primary }]}>
           <View style={styles.attendanceHeader}>
             <Clock size={20} color={theme.colors.primary} />
             <Text
@@ -759,32 +784,106 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  logoutButton: {
-    padding: 8,
+
+  // ─── Hero Section ──────────────────────────────────────────────────────────
+  heroSection: {
+    paddingHorizontal: 16,
+    paddingBottom: 22,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
   },
-  profileBanner: {
+  heroTopRow: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 16,
+    gap: 12,
+    marginBottom: 16,
   },
-  avatarCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+  heroAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 12,
   },
-  profileText: {
+  heroInfo: {
     flex: 1,
   },
-  welcomeText: {
+  heroDashLabel: {
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 10,
+    fontWeight: "700",
     textTransform: "uppercase",
-    letterSpacing: 0.5,
+    letterSpacing: 1,
   },
-  nameText: {
+  heroName: {
+    color: "#ffffff",
+    fontSize: 19,
+    fontWeight: "800",
+    marginTop: 2,
+    marginBottom: 1,
+  },
+  heroMobile: {
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 12,
+  },
+  heroActions: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  heroActionBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  heroBottomRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  heroStatusPill: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 20,
+  },
+  heroStatusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  heroStatusText: {
+    color: "#ffffff",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  heroJobBadge: {
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    borderRadius: 20,
+    alignItems: "center",
+    minWidth: 72,
+  },
+  heroJobNum: {
+    color: "#ffffff",
+    fontSize: 20,
+    fontWeight: "800",
+    lineHeight: 24,
+  },
+  heroJobLabel: {
+    color: "rgba(255,255,255,0.75)",
+    fontSize: 10,
+    fontWeight: "600",
     marginTop: 1,
   },
+  // ─────────────────────────────────────────────────────────────────────────
+
   scrollContent: {
     padding: 16,
     paddingBottom: 40,

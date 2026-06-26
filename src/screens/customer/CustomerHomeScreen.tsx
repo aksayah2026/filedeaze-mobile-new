@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  TextInput,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -70,6 +71,11 @@ export const CustomerHomeScreen = () => {
   const [activeTab, setActiveTab] = useState<CustomerTab>("HOME");
   const [logoutPopupVisible, setLogoutPopupVisible] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [showAllCats, setShowAllCats] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [featuredDotIdx, setFeaturedDotIdx] = useState(0);
+  const featuredScrollRef = useRef<ScrollView>(null);
+  const featuredIndexRef = useRef(0);
 
   // Queries
   const { data: categories = [], isLoading: isCategoriesLoading } = useCategories();
@@ -120,7 +126,19 @@ export const CustomerHomeScreen = () => {
     }
   }, [profile]);
 
-  // Removed drawer logic
+  // Auto-scroll featured carousel every 3 seconds
+  useEffect(() => {
+    if (categories.length === 0) return;
+    const total = Math.min(categories.length, 5);
+    const cardW = Dimensions.get("window").width - 32;
+    const timer = setInterval(() => {
+      const next = (featuredIndexRef.current + 1) % total;
+      featuredIndexRef.current = next;
+      setFeaturedDotIdx(next);
+      featuredScrollRef.current?.scrollTo({ x: next * (cardW + 12), animated: true });
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [categories.length]);
 
   const handleSaveProfile = () => {
     updateProfileMutation.mutate(
@@ -242,28 +260,75 @@ export const CustomerHomeScreen = () => {
 
   const SCREEN_W = Dimensions.get("window").width;
   const CAT_CARD_W = Math.floor((SCREEN_W - 32 - 24) / 3);
+  const FEATURED_CARD_W = SCREEN_W - 32;
+
+  const getCatBannerGrad = (name: string): [string, string] => {
+    const n = name.toLowerCase();
+    if (n.includes("electric") || n.includes("power") || n.includes("wire") || n.includes("wiring"))
+      return ["#1C0A00", "#3B1500"];
+    if (n.includes("plumb") || n.includes("water") || n.includes("pipe") || n.includes("leak") || n.includes("tap"))
+      return ["#00102B", "#001845"];
+    if (n.includes("ac") || n.includes("cool") || n.includes("hvac") || n.includes("air con"))
+      return ["#001020", "#001C35"];
+    if (n.includes("carpent") || n.includes("wood") || n.includes("furniture") || n.includes("joiner"))
+      return ["#120A00", "#251500"];
+    if (n.includes("paint") || n.includes("colour") || n.includes("color") || n.includes("wall"))
+      return ["#110020", "#1E0035"];
+    if (n.includes("clean") || n.includes("sweep") || n.includes("mop") || n.includes("sanitiz"))
+      return ["#000F08", "#001A0F"];
+    if (n.includes("pest") || n.includes("termite") || n.includes("insect"))
+      return ["#0A0800", "#1A1200"];
+    if (n.includes("appliance") || n.includes("repair") || n.includes("fix") || n.includes("washing"))
+      return ["#001420", "#001C2E"];
+    if (n.includes("salon") || n.includes("beauty") || n.includes("spa") || n.includes("hair"))
+      return ["#20001A", "#350028"];
+    if (n.includes("security") || n.includes("cctv") || n.includes("camera"))
+      return ["#0A0010", "#180020"];
+    if (n.includes("garden") || n.includes("lawn") || n.includes("landscap"))
+      return ["#000F06", "#001A0C"];
+    return ["#1E293B", "#0F172A"];
+  };
 
   const getCatImage = (name: string): string => {
     const n = name.toLowerCase();
-    if (n.includes("electrical") || n.includes("power") || n.includes("wire"))
-      return "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=300&h=200&fit=crop";
-    if (n.includes("plumb") || n.includes("water") || n.includes("leak"))
-      return "https://images.unsplash.com/photo-1607400201889-565b1ee75f8e?w=300&h=200&fit=crop";
-    if (n.includes("ac") || n.includes("cool") || n.includes("heat") || n.includes("hvac"))
-      return "https://images.unsplash.com/photo-1585771724684-38269d6639fd?w=300&h=200&fit=crop";
-    if (n.includes("carpenter") || n.includes("wood") || n.includes("furniture"))
-      return "https://images.unsplash.com/photo-1504148455328-c376907d081c?w=300&h=200&fit=crop";
-    if (n.includes("paint"))
-      return "https://images.unsplash.com/photo-1562259929-b4e1fd3aef09?w=300&h=200&fit=crop";
-    if (n.includes("clean"))
-      return "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=300&h=200&fit=crop";
-    if (n.includes("pest"))
-      return "https://images.unsplash.com/photo-1632921522769-8ca3f7c1e4e3?w=300&h=200&fit=crop";
-    if (n.includes("appliance") || n.includes("repair") || n.includes("fix"))
-      return "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=300&h=200&fit=crop";
-    if (n.includes("salon") || n.includes("beauty") || n.includes("spa"))
-      return "https://images.unsplash.com/photo-1560066984-138daaa0ad8a?w=300&h=200&fit=crop";
-    return "https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?w=300&h=200&fit=crop";
+    if (n.includes("electric") || n.includes("power") || n.includes("wire") || n.includes("wiring"))
+      return "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=400&h=260&fit=crop";
+    if (n.includes("plumb") || n.includes("water") || n.includes("leak") || n.includes("pipe") || n.includes("tap"))
+      return "https://images.unsplash.com/photo-1607400201889-565b1ee75f8e?w=400&h=260&fit=crop";
+    if (n.includes("ac") || n.includes("air con") || n.includes("cool") || n.includes("hvac") || n.includes("refriger"))
+      return "https://images.unsplash.com/photo-1563014572-74af7be95775?w=400&h=260&fit=crop";
+    if (n.includes("carpent") || n.includes("wood") || n.includes("furniture") || n.includes("cabinet") || n.includes("joiner"))
+      return "https://images.unsplash.com/photo-1504148455328-c376907d081c?w=400&h=260&fit=crop";
+    if (n.includes("paint") || n.includes("colour") || n.includes("color") || n.includes("wall finish"))
+      return "https://images.unsplash.com/photo-1562259929-b4e1fd3aef09?w=400&h=260&fit=crop";
+    if (n.includes("clean") || n.includes("sweep") || n.includes("mop") || n.includes("sanitiz") || n.includes("hygiene"))
+      return "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=400&h=260&fit=crop";
+    if (n.includes("pest") || n.includes("cockroach") || n.includes("rat") || n.includes("termite") || n.includes("insect"))
+      return "https://images.unsplash.com/photo-1628177142898-93e36e4e3a50?w=400&h=260&fit=crop";
+    if (n.includes("appliance") || n.includes("washing") || n.includes("fridge") || n.includes("microwave") || n.includes("machine"))
+      return "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=260&fit=crop";
+    if (n.includes("salon") || n.includes("beauty") || n.includes("spa") || n.includes("hair") || n.includes("grooming"))
+      return "https://images.unsplash.com/photo-1560066984-138daaa0ad8a?w=400&h=260&fit=crop";
+    if (n.includes("security") || n.includes("cctv") || n.includes("camera") || n.includes("alarm") || n.includes("surveillance"))
+      return "https://images.unsplash.com/photo-1580428180098-24b353d7e9d9?w=400&h=260&fit=crop";
+    if (n.includes("garden") || n.includes("lawn") || n.includes("plant") || n.includes("outdoor") || n.includes("landscap"))
+      return "https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=400&h=260&fit=crop";
+    if (n.includes("move") || n.includes("shifting") || n.includes("packer") || n.includes("relocat") || n.includes("transport"))
+      return "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400&h=260&fit=crop";
+    if (n.includes("roof") || n.includes("ceiling") || n.includes("tile") || n.includes("floor") || n.includes("mason"))
+      return "https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?w=400&h=260&fit=crop";
+    if (n.includes("weld") || n.includes("fabricat") || n.includes("metal") || n.includes("gate") || n.includes("grill"))
+      return "https://images.unsplash.com/photo-1565849904461-04a58ad377e0?w=400&h=260&fit=crop";
+    if (n.includes("repair") || n.includes("fix") || n.includes("handyman") || n.includes("maintenance"))
+      return "https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?w=400&h=260&fit=crop";
+    const FALLBACKS = [
+      "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=400&h=260&fit=crop",
+      "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=400&h=260&fit=crop",
+      "https://images.unsplash.com/photo-1517646287270-a5a9ca602e5c?w=400&h=260&fit=crop",
+      "https://images.unsplash.com/photo-1574359411659-15573a27fd0c?w=400&h=260&fit=crop",
+      "https://images.unsplash.com/photo-1565538810643-b5bdb714032a?w=400&h=260&fit=crop",
+    ];
+    return FALLBACKS[name.charCodeAt(0) % FALLBACKS.length];
   };
 
   return (
@@ -324,40 +389,128 @@ export const CustomerHomeScreen = () => {
               </View>
             </View>
 
-            {/* Search Bar */}
-            <View style={[styles.homeSearchWrap, { backgroundColor: theme.colors.card }]}>
-              <View style={[styles.homeSearchBar, { backgroundColor: theme.colors.background, borderColor: theme.colors.borderLight }]}>
-                <Search size={17} color={theme.colors.textLight} />
-                <Text style={[styles.homeSearchPlaceholder, { color: theme.colors.textLight }]}>Search for "Kitchen cleaning"</Text>
+            {/* Search Bar + Dropdown */}
+            <View style={[styles.homeSearchWrap, { zIndex: 100, elevation: 100 }]}>
+              <View style={{ position: "relative" }}>
+              <View style={[styles.homeSearchBar, { backgroundColor: theme.colors.background, borderColor: searchQuery ? theme.colors.primary : theme.colors.borderLight }]}>
+                <Search size={17} color={searchQuery ? theme.colors.primary : theme.colors.textLight} />
+                <TextInput
+                  style={[styles.homeSearchInput, { color: theme.colors.text }]}
+                  placeholder="Search for services..."
+                  placeholderTextColor={theme.colors.textLight}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  returnKeyType="search"
+                  autoCapitalize="none"
+                />
+                {searchQuery.length > 0 && (
+                  <Pressable onPress={() => setSearchQuery("")} style={{ padding: 4 }}>
+                    <Text style={{ color: theme.colors.textMuted, fontSize: 16, lineHeight: 18 }}>✕</Text>
+                  </Pressable>
+                )}
+              </View>
+              {/* Search Dropdown */}
+              {searchQuery.length > 0 && (
+                <View style={[styles.searchDropdown, { backgroundColor: theme.colors.card, borderColor: theme.colors.borderLight }]}>
+                  {(() => {
+                    const results = categories.filter((c: any) =>
+                      c.name.toLowerCase().includes(searchQuery.toLowerCase())
+                    );
+                    if (results.length === 0) {
+                      return (
+                        <View style={{ padding: 18, alignItems: "center" }}>
+                          <Text style={{ color: theme.colors.textMuted, fontSize: 13 }}>No services found for "{searchQuery}"</Text>
+                        </View>
+                      );
+                    }
+                    return results.slice(0, 7).map((cat: any, idx: number) => (
+                      <Pressable
+                        key={cat.id}
+                        style={({ pressed }) => [
+                          styles.searchDropdownItem,
+                          { borderBottomColor: theme.colors.borderLight },
+                          idx === results.slice(0, 7).length - 1 && { borderBottomWidth: 0 },
+                          pressed && { backgroundColor: `${theme.colors.primary}10` },
+                        ]}
+                        onPress={() => {
+                          setSearchQuery("");
+                          navigation.navigate("RaiseTicket", { categoryId: cat.id, categoryName: cat.name });
+                        }}
+                      >
+                        <Image source={{ uri: getCatImage(cat.name) }} style={styles.searchDropdownImg} resizeMode="cover" />
+                        <Text style={[styles.searchDropdownName, { color: theme.colors.text }]} numberOfLines={1}>{cat.name}</Text>
+                        <ChevronRight size={14} color={theme.colors.textMuted} />
+                      </Pressable>
+                    ));
+                  })()}
+                </View>
+              )}
               </View>
             </View>
 
-            {/* Hero Banner */}
-            <View style={styles.heroBannerWrap}>
-              <LinearGradient
-                colors={["#1E293B", "#0F172A"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.heroBanner}
-              >
-                <View style={styles.heroBannerLeft}>
-                  <Text style={styles.heroBannerTag}>⭐ FEATURED</Text>
-                  <Text style={styles.heroBannerTitle}>Professional{"\n"}Home Services</Text>
-                  <Text style={styles.heroBannerSub}>Trusted experts at{"\n"}your doorstep</Text>
-                  <Pressable
-                    style={[styles.heroBannerBtn, { backgroundColor: theme.colors.primary }]}
-                    onPress={() => categories.length > 0 && navigation.navigate("RaiseTicket", { categoryId: categories[0].id, categoryName: categories[0].name })}
+            {/* Featured Services Banner Carousel */}
+            {!isCategoriesLoading && categories.length > 0 && (
+              <View style={styles.featuredSection}>
+                <Text style={[styles.featuredLabel, { color: theme.colors.textMuted }]}>Popular Services</Text>
+                <View style={{ position: "relative" }}>
+                  <ScrollView
+                    ref={featuredScrollRef}
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.featuredList}
+                    decelerationRate="fast"
+                    snapToInterval={FEATURED_CARD_W + 12}
+                    snapToAlignment="start"
+                    scrollEventThrottle={16}
                   >
-                    <Text style={styles.heroBannerBtnText}>Book Now</Text>
-                  </Pressable>
+                    {categories.slice(0, 5).map((cat: any) => (
+                      <LinearGradient
+                        key={cat.id}
+                        colors={getCatBannerGrad(cat.name)}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0.6 }}
+                        style={[styles.featuredBannerCard, { width: FEATURED_CARD_W }]}
+                      >
+                        <View style={styles.featuredBannerLeft}>
+                          <View style={styles.featuredBannerTagRow}>
+                            <Text style={styles.featuredBannerStar}>⭐</Text>
+                            <Text style={styles.featuredBannerTag}>TOP SERVICE</Text>
+                          </View>
+                          <Text style={styles.featuredBannerName} numberOfLines={2}>{cat.name}</Text>
+                          <Text style={styles.featuredBannerSub}>Experts at your doorstep</Text>
+                          <Pressable
+                            style={[styles.featuredBannerBtn, { backgroundColor: theme.colors.primary }]}
+                            onPress={() => navigation.navigate("RaiseTicket", { categoryId: cat.id, categoryName: cat.name })}
+                          >
+                            <Text style={styles.featuredBannerBtnText}>Book Now</Text>
+                          </Pressable>
+                        </View>
+                        <Image
+                          source={{ uri: getCatImage(cat.name) }}
+                          style={styles.featuredBannerImg}
+                          resizeMode="cover"
+                        />
+                      </LinearGradient>
+                    ))}
+                  </ScrollView>
+                  {/* Dots overlaid at bottom of carousel */}
+                  <View pointerEvents="none" style={styles.featuredDots}>
+                    {categories.slice(0, 5).map((_: any, i: number) => (
+                      <View
+                        key={i}
+                        style={[
+                          styles.featuredDot,
+                          {
+                            backgroundColor: i === featuredDotIdx ? "#ffffff" : "rgba(255,255,255,0.35)",
+                            width: i === featuredDotIdx ? 20 : 6,
+                          },
+                        ]}
+                      />
+                    ))}
+                  </View>
                 </View>
-                <Image
-                  source={{ uri: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=300&h=260&fit=crop" }}
-                  style={styles.heroBannerImg}
-                  resizeMode="cover"
-                />
-              </LinearGradient>
-            </View>
+              </View>
+            )}
 
             {/* Promo Chips */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.promoChipRow}>
@@ -382,30 +535,52 @@ export const CustomerHomeScreen = () => {
               {isCategoriesLoading ? (
                 <AppLoader message="Loading..." />
               ) : (
-                <View style={styles.catGridUC}>
-                  {categories.map((cat: any) => (
+                <>
+                  <View style={styles.catGridUC}>
+                    {categories.slice(0, showAllCats ? categories.length : 6).map((cat: any) => (
+                      <Pressable
+                        key={cat.id}
+                        style={({ pressed }) => [
+                          styles.catCardUC,
+                          { backgroundColor: theme.colors.card, width: CAT_CARD_W },
+                          pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] },
+                        ]}
+                        onPress={() => navigation.navigate("RaiseTicket", { categoryId: cat.id, categoryName: cat.name })}
+                      >
+                        <View style={[styles.catImageWrap, { backgroundColor: theme.colors.background }]}>
+                          <Image
+                            source={{ uri: getCatImage(cat.name) }}
+                            style={styles.catImage}
+                            resizeMode="cover"
+                          />
+                        </View>
+                        <Text style={[styles.catNameUC, { color: theme.colors.text }]} numberOfLines={2}>
+                          {cat.name}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                  {categories.length > 6 && (
                     <Pressable
-                      key={cat.id}
+                      onPress={() => setShowAllCats(p => !p)}
                       style={({ pressed }) => [
-                        styles.catCardUC,
-                        { backgroundColor: theme.colors.card, width: CAT_CARD_W },
-                        pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] },
+                        styles.showMoreBtn,
+                        {
+                          backgroundColor: theme.colors.card,
+                          borderColor: `${theme.colors.primary}30`,
+                          opacity: pressed ? 0.8 : 1,
+                        },
                       ]}
-                      onPress={() => navigation.navigate("RaiseTicket", { categoryId: cat.id, categoryName: cat.name })}
                     >
-                      <View style={[styles.catImageWrap, { backgroundColor: theme.colors.background }]}>
-                        <Image
-                          source={{ uri: getCatImage(cat.name) }}
-                          style={styles.catImage}
-                          resizeMode="cover"
-                        />
-                      </View>
-                      <Text style={[styles.catNameUC, { color: theme.colors.text }]} numberOfLines={2}>
-                        {cat.name}
+                      <Text style={[styles.showMoreText, { color: theme.colors.primary }]}>
+                        {showAllCats ? "Show Less" : "View all services"}
+                      </Text>
+                      <Text style={{ color: theme.colors.primary, fontSize: 11, marginTop: 1 }}>
+                        {showAllCats ? "▲" : "▼"}
                       </Text>
                     </Pressable>
-                  ))}
-                </View>
+                  )}
+                </>
               )}
             </View>
 
@@ -1193,6 +1368,116 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.5,
   },
+  featuredSection: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 6,
+  },
+  featuredLabel: {
+    fontSize: 11,
+    fontWeight: "700" as const,
+    letterSpacing: 0.8,
+    textTransform: "uppercase" as const,
+    marginBottom: 12,
+  },
+  featuredList: {
+    gap: 12,
+    paddingBottom: 4,
+  },
+  featuredBannerCard: {
+    borderRadius: 18,
+    overflow: "hidden" as const,
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    paddingLeft: 20,
+    paddingVertical: 18,
+    minHeight: 155,
+  },
+  featuredBannerLeft: {
+    flex: 1,
+    paddingRight: 10,
+  },
+  featuredBannerTagRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 6,
+    marginBottom: 10,
+  },
+  featuredBannerStar: {
+    fontSize: 13,
+  },
+  featuredBannerTag: {
+    fontSize: 10,
+    fontWeight: "700" as const,
+    color: "rgba(255,255,255,0.58)",
+    letterSpacing: 1.5,
+    textTransform: "uppercase" as const,
+  },
+  featuredBannerName: {
+    fontSize: 19,
+    fontWeight: "800" as const,
+    color: "#ffffff",
+    lineHeight: 25,
+    marginBottom: 5,
+  },
+  featuredBannerSub: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.60)",
+    marginBottom: 14,
+    lineHeight: 17,
+  },
+  featuredBannerBtn: {
+    alignSelf: "flex-start" as const,
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    borderRadius: 22,
+  },
+  featuredBannerBtnText: {
+    fontSize: 13,
+    fontWeight: "700" as const,
+    color: "#ffffff",
+  },
+  featuredBannerImg: {
+    width: 110,
+    height: 120,
+    borderRadius: 12,
+  },
+  featuredDots: {
+    position: "absolute" as const,
+    bottom: 10,
+    left: 0,
+    right: 0,
+    flexDirection: "row" as const,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+    gap: 5,
+  },
+  featuredDot: {
+    height: 5,
+    borderRadius: 3,
+  },
+  showMoreBtn: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    gap: 6,
+    alignSelf: "center" as const,
+    marginTop: 16,
+    paddingVertical: 11,
+    paddingHorizontal: 28,
+    borderRadius: 26,
+    borderWidth: 1.5,
+    shadowColor: "rgba(0,0,0,0.07)",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  showMoreText: {
+    fontSize: 13,
+    fontWeight: "700" as const,
+    letterSpacing: 0.2,
+  },
   locationBar: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
@@ -1240,6 +1525,44 @@ const styles = StyleSheet.create({
   homeSearchPlaceholder: {
     fontSize: 14,
     flex: 1,
+  },
+  homeSearchInput: {
+    fontSize: 14,
+    flex: 1,
+    paddingVertical: 0,
+  },
+  searchDropdown: {
+    position: "absolute" as const,
+    top: 52,
+    left: 0,
+    right: 0,
+    borderRadius: 14,
+    borderWidth: 1,
+    zIndex: 200,
+    elevation: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.13,
+    shadowRadius: 16,
+    overflow: "hidden" as const,
+  },
+  searchDropdownItem: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    gap: 12,
+    borderBottomWidth: 0.5,
+  },
+  searchDropdownImg: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+  },
+  searchDropdownName: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "500" as const,
   },
   heroBannerWrap: {
     paddingHorizontal: 16,

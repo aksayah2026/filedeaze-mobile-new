@@ -241,7 +241,7 @@ export const TechnicianJobDetailsScreen = () => {
     if (status === "ACCEPTED") {
       // 1. Check if the technician already has another active job
       const hasActiveJob = Array.isArray(allJobs) && allJobs.some(
-        (j) => j.id !== jobId && ["ACCEPTED", "TRAVELLING", "REACHED", "IN_PROGRESS", "PENDING", "RESCHEDULED", "INVOICE_GENERATED", "COMPLETED"].includes(j.status)
+        (j) => j.id !== jobId && ["ACCEPTED", "TRAVELLING", "REACHED", "IN_PROGRESS", "RESCHEDULED", "INVOICE_GENERATED", "COMPLETED"].includes(j.status)
       );
       if (hasActiveJob) {
         setAlertModalTitle("Active Job Pending");
@@ -755,7 +755,8 @@ export const TechnicianJobDetailsScreen = () => {
                 />
                 <AppButton
                   title="Accept Ticket"
-                  onPress={() => navigation.navigate("AcceptTicket", { jobId: job.id, ticketNo: job.ticketNo, customerName: job.customerName, service: job.service })}
+                  onPress={() => handleStatusChange("ACCEPTED")}
+                  loading={updateStatusMutation.isPending}
                   style={{ flex: 1.5 }}
                 />
               </View>

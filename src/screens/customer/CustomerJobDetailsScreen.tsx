@@ -133,6 +133,7 @@ export const CustomerJobDetailsScreen = () => {
   const isCancellable = ["NEW_TICKET", "ASSIGNED", "ACCEPTED"].includes(ticket.status);
   const isTrackable = ["TRAVELLING", "REACHED_LOCATION", "IN_PROGRESS"].includes(ticket.status);
   const isClosed = ["COMPLETED", "INVOICE_GENERATED", "TICKET_CLOSED", "CLOSED"].includes(ticket.status);
+  const isCancelled = ticket.status === "CANCELLED";
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return "—";
@@ -187,89 +188,117 @@ export const CustomerJobDetailsScreen = () => {
           <Text style={[styles.desc, { color: theme.colors.textMuted }]}>{ticket.description}</Text>
         </View>
 
-        {/* Assigned Technician Profile */}
-        <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>Assigned Expert</Text>
-        <View style={[styles.premiumCard, { backgroundColor: theme.colors.card }]}>
-          {ticket.technician ? (
-            <View style={styles.techRow}>
-              <View style={[styles.techAvatarPlaceholder, { backgroundColor: `${theme.colors.primary}12` }]}>
-                <Text style={[styles.avatarInitials, { color: theme.colors.primary }]}>
-                  {ticket.technician.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
-                </Text>
+        {/* Cancellation Notice — shown only when ticket is CANCELLED */}
+        {isCancelled && (
+          <View style={[styles.premiumCard, { backgroundColor: `${theme.colors.danger}08`, borderWidth: 1, borderColor: `${theme.colors.danger}30` }]}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 8 }}>
+              <XCircle size={20} color={theme.colors.danger} />
+              <Text style={{ fontSize: 15, fontWeight: "700", color: theme.colors.danger }}>Ticket Cancelled</Text>
+            </View>
+            <Text style={{ fontSize: 13, color: theme.colors.textMuted, lineHeight: 20 }}>
+              This service request has been cancelled. The assigned expert, scheduled visit date, and site details are no longer applicable.
+            </Text>
+            {ticket.cancelReason ? (
+              <View style={{ marginTop: 10, padding: 10, backgroundColor: `${theme.colors.danger}08`, borderRadius: 8 }}>
+                <Text style={{ fontSize: 11, fontWeight: "700", color: theme.colors.danger, marginBottom: 3 }}>REASON</Text>
+                <Text style={{ fontSize: 13, color: theme.colors.text }}>{ticket.cancelReason}</Text>
               </View>
-              <View style={styles.techText}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                  <Text style={[styles.techName, { color: theme.colors.text }]}>{ticket.technician.name}</Text>
-                  <View style={[styles.verifiedBadge, { backgroundColor: `${theme.colors.success}12` }]}>
-                    <ShieldCheck size={11} color={theme.colors.success} />
-                    <Text style={[styles.verifiedText, { color: theme.colors.success }]}>Verified</Text>
+            ) : null}
+          </View>
+        )}
+
+        {/* Assigned Technician Profile */}
+        {!isCancelled && (
+          <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>Assigned Expert</Text>
+        )}
+        {!isCancelled && (
+          <View style={[styles.premiumCard, { backgroundColor: theme.colors.card }]}>
+            <View style={styles.techRow}>
+              {ticket.technician ? (
+                <View style={[styles.techAvatarPlaceholder, { backgroundColor: `${theme.colors.primary}12` }]}>
+                  <Text style={[styles.avatarInitials, { color: theme.colors.primary }]}>
+                    {ticket.technician.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
+                  </Text>
+                </View>
+              ) : (
+                <View style={[styles.techAvatarPlaceholder, { backgroundColor: `${theme.colors.primary}12` }]}>
+                  <Clock color={theme.colors.primary} size={22} />
+                </View>
+              )}
+              {ticket.technician ? (
+                <View style={styles.techText}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Text style={[styles.techName, { color: theme.colors.text }]}>{ticket.technician.name}</Text>
+                    <View style={[styles.verifiedBadge, { backgroundColor: `${theme.colors.success}12` }]}>
+                      <ShieldCheck size={11} color={theme.colors.success} />
+                      <Text style={[styles.verifiedText, { color: theme.colors.success }]}>Verified</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.techRole, { color: theme.colors.textMuted, marginTop: 2 }]}>
+                    Certified Field Service Technician
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.techText}>
+                  <Text style={[styles.techName, { color: theme.colors.text }]}>Finding Your Expert</Text>
+                  <Text style={{ color: theme.colors.textMuted, fontSize: 12, marginTop: 2, lineHeight: 17 }}>
+                    We're matching you with the best available technician. You'll be notified once assigned.
+                  </Text>
+                  <View style={{ marginTop: 8, alignSelf: "flex-start", backgroundColor: `${theme.colors.primary}15`, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 }}>
+                    <Text style={{ fontSize: 11, color: theme.colors.primary, fontWeight: "600" }}>Searching...</Text>
                   </View>
                 </View>
-                <Text style={[styles.techRole, { color: theme.colors.textMuted, marginTop: 2 }]}>
-                  Certified Field Service Technician
-                </Text>
-              </View>
+              )}
             </View>
-          ) : (
-            <View style={styles.techRow}>
-              <View style={[styles.techAvatarPlaceholder, { backgroundColor: `${theme.colors.borderLight}` }]}>
-                <HelpCircle color={theme.colors.textMuted} size={22} />
-              </View>
-              <View style={styles.techText}>
-                <Text style={[styles.techName, { color: theme.colors.textMuted }]}>Assigning Expert...</Text>
-                <Text style={{ color: theme.colors.textMuted, fontSize: 12, marginTop: 2 }}>
-                  We are assigning the best technician for you
-                </Text>
-              </View>
-            </View>
-          )}
-
-          {ticket.technician && (
-            <>
-              <View style={[styles.divider, { backgroundColor: theme.colors.borderLight }]} />
-              <View style={styles.techActionBox}>
-                <Text style={{ fontSize: 13, color: theme.colors.textMuted, flex: 1 }}>
-                  Contact dispatch desk:
-                </Text>
-                <Pressable
-                  style={[styles.callButton, { backgroundColor: `${theme.colors.primary}12` }]}
-                  onPress={() => openPhone(ticket.technician!.phone)}
-                >
-                  <Phone size={14} color={theme.colors.primary} style={{ marginRight: 6 }} />
-                  <Text style={[styles.callButtonText, { color: theme.colors.primary }]}>Call Technician</Text>
-                </Pressable>
-              </View>
-            </>
-          )}
-        </View>
+            {ticket.technician && (
+              <>
+                <View style={[styles.divider, { backgroundColor: theme.colors.borderLight }]} />
+                <View style={styles.techActionBox}>
+                  <Text style={{ fontSize: 13, color: theme.colors.textMuted, flex: 1 }}>
+                    Contact dispatch desk:
+                  </Text>
+                  <Pressable
+                    style={[styles.callButton, { backgroundColor: `${theme.colors.primary}12` }]}
+                    onPress={() => openPhone(ticket.technician!.phone)}
+                  >
+                    <Phone size={14} color={theme.colors.primary} style={{ marginRight: 6 }} />
+                    <Text style={[styles.callButtonText, { color: theme.colors.primary }]}>Call Technician</Text>
+                  </Pressable>
+                </View>
+              </>
+            )}
+          </View>
+        )}
 
         {/* Service Location details */}
-        <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>Schedule & Site</Text>
-        <View style={[styles.premiumCard, { backgroundColor: theme.colors.card }]}>
-          <View style={styles.infoRow}>
-            <View style={[styles.iconContainer, { backgroundColor: `${theme.colors.primary}12` }]}>
-              <Calendar size={18} color={theme.colors.primary} />
+        {!isCancelled && <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>Schedule & Site</Text>}
+        {!isCancelled && (
+          <View style={[styles.premiumCard, { backgroundColor: theme.colors.card }]}>
+            <View style={styles.infoRow}>
+              <View style={[styles.iconContainer, { backgroundColor: `${theme.colors.primary}12` }]}>
+                <Calendar size={18} color={theme.colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 11, color: theme.colors.textMuted, textTransform: "uppercase", fontWeight: "700", letterSpacing: 0.5, marginBottom: 2 }}>Scheduled Date</Text>
+                <Text style={[styles.infoVal, { color: theme.colors.text, fontWeight: "700" }]}>{formatDate(ticket.scheduledAt)}</Text>
+              </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 11, color: theme.colors.textMuted, textTransform: "uppercase", fontWeight: "700", letterSpacing: 0.5, marginBottom: 2 }}>Scheduled Date</Text>
-              <Text style={[styles.infoVal, { color: theme.colors.text, fontWeight: "700" }]}>{formatDate(ticket.scheduledAt)}</Text>
+
+            <View style={[styles.divider, { backgroundColor: theme.colors.borderLight }]} />
+
+            <View style={styles.infoRow}>
+              <View style={[styles.iconContainer, { backgroundColor: `${theme.colors.primary}12` }]}>
+                <MapPin size={18} color={theme.colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 11, color: theme.colors.textMuted, textTransform: "uppercase", fontWeight: "700", letterSpacing: 0.5, marginBottom: 2 }}>Service Address</Text>
+                <Text style={[styles.infoVal, { color: theme.colors.text, fontWeight: "500", lineHeight: 18 }]}>
+                  {ticket.serviceAddress || "—"}
+                </Text>
+              </View>
             </View>
           </View>
-
-          <View style={[styles.divider, { backgroundColor: theme.colors.borderLight }]} />
-
-          <View style={styles.infoRow}>
-            <View style={[styles.iconContainer, { backgroundColor: `${theme.colors.primary}12` }]}>
-              <MapPin size={18} color={theme.colors.primary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 11, color: theme.colors.textMuted, textTransform: "uppercase", fontWeight: "700", letterSpacing: 0.5, marginBottom: 2 }}>Service Address</Text>
-              <Text style={[styles.infoVal, { color: theme.colors.text, fontWeight: "500", lineHeight: 18 }]}>
-                {ticket.serviceAddress || "—"}
-              </Text>
-            </View>
-          </View>
-        </View>
+        )}
 
         {/* Visual Progress Timeline */}
         <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>Timeline</Text>

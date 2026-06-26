@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -9,13 +9,15 @@ import {
   ScrollView,
   Pressable,
   TextInput,
+  Modal,
+  TouchableOpacity,
 } from "react-native";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { Shield, Mail, Lock } from "lucide-react-native";
+import { Shield, Mail, Lock, Eye, EyeOff } from "lucide-react-native";
 
 import { useTheme } from "../../theme";
 import { useAuthStore } from "../../store/auth.store";
@@ -35,14 +37,20 @@ export const LoginScreen = () => {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProps>();
   const { login, isLoading, error } = useAuthStore();
+  const [showPassword, setShowPassword] = useState(false);
 
   const { email: routeEmail = "", successBanner = false } = route.params || {};
   const passwordInputRef = useRef<TextInput>(null);
+
+  const [validationPopupVisible, setValidationPopupVisible] = useState(false);
+  const [validationPopupMsg, setValidationPopupMsg] = useState("");
 
   const {
     control,
     handleSubmit,
     setValue,
+    trigger,
+    getValues,
     formState: { errors },
   } = useForm<CustomerLoginInput>({
     resolver: zodResolver(customerLoginSchema),
@@ -68,6 +76,32 @@ export const LoginScreen = () => {
       await login(data.email, data.password);
     } catch {
       // Error handled by store and displayed via UI
+    }
+  };
+
+  const onPressSignIn = async () => {
+    await trigger();
+    const currentValues = getValues();
+
+    if (!currentValues.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(currentValues.email)) {
+      setValidationPopupMsg("Please enter a valid email address to continue.");
+      setValidationPopupVisible(true);
+      return;
+    }
+
+    if (!currentValues.password) {
+      setValidationPopupMsg("Please enter your password.");
+      setValidationPopupVisible(true);
+      return;
+    }
+
+    try {
+      await login(currentValues.email, currentValues.password);
+    } catch (err: any) {
+      const msg = err?.message || "Login failed.";
+      const isWrongPassword = /password|credential|invalid|incorrect|wrong/i.test(msg);
+      setValidationPopupMsg(isWrongPassword ? "Wrong Password. Please try again." : msg);
+      setValidationPopupVisible(true);
     }
   };
 
@@ -151,17 +185,24 @@ export const LoginScreen = () => {
                 value={value}
                 onBlur={onBlur}
                 onChangeText={onChange}
-                secureTextEntry
+                secureTextEntry={!showPassword}
                 error={errors.password?.message}
                 autoCapitalize="none"
                 leftIcon={<Lock size={20} color={theme.colors.textLight} />}
+                rightIcon={
+                  <Pressable onPress={() => setShowPassword(p => !p)} style={{ padding: 4 }}>
+                    {showPassword
+                      ? <EyeOff size={18} color={theme.colors.textMuted} />
+                      : <Eye size={18} color={theme.colors.textMuted} />}
+                  </Pressable>
+                }
               />
             )}
           />
 
           <AppButton
             title="Sign In"
-            onPress={handleSubmit(onSubmit)}
+            onPress={onPressSignIn}
             loading={isLoading}
             style={{ marginTop: 16 }}
           />
@@ -176,6 +217,20 @@ export const LoginScreen = () => {
           </View>
         </AppCard>
       </ScrollView>
+
+      <Modal visible={validationPopupVisible} transparent animationType="fade" onRequestClose={() => setValidationPopupVisible(false)}>
+        <View style={styles.popupOverlay}>
+          <View style={[styles.popupCard, { backgroundColor: theme.colors.card }]}>
+            <Text style={[styles.popupMessage, { color: theme.colors.text }]}>{validationPopupMsg}</Text>
+            <TouchableOpacity
+              style={[styles.popupBtn, { backgroundColor: theme.colors.primary }]}
+              onPress={() => setValidationPopupVisible(false)}
+            >
+              <Text style={styles.popupBtnText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 };
@@ -271,6 +326,42 @@ const styles = StyleSheet.create({
   linkText: {
     fontSize: 12,
     fontWeight: "600",
+  },
+  popupOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 32,
+  },
+  popupCard: {
+    width: "100%",
+    borderRadius: 16,
+    padding: 24,
+    alignItems: "center",
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+  },
+  popupMessage: {
+    fontSize: 14,
+    lineHeight: 22,
+    textAlign: "center",
+    marginBottom: 20,
+    fontWeight: "500",
+  },
+  popupBtn: {
+    paddingVertical: 12,
+    paddingHorizontal: 40,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  popupBtnText: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "700",
   },
 });
 export default LoginScreen;

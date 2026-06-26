@@ -33,23 +33,29 @@ apiClient.interceptors.request.use(
   }
 );
 
+let _logoutPending = false;
+
 // Response Interceptor for global error handling
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
-    // Handle 401 Unauthorized globally
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
-      
-      // Auto logout on token expiration
-      useAuthStore.getState().logout();
-      
-      return Promise.reject(new Error("Session expired. Please log in again."));
+
+      const url: string = originalRequest.url || "";
+      const isAuthEndpoint = url.includes("/auth/");
+      const { isAuthenticated } = useAuthStore.getState();
+
+      if (isAuthenticated && !isAuthEndpoint && !_logoutPending) {
+        _logoutPending = true;
+        useAuthStore.getState().logout();
+        setTimeout(() => { _logoutPending = false; }, 5000);
+        return Promise.reject(new Error("Your session has expired. Please log in again."));
+      }
     }
 
-    // Parse friendly message if available
     const errorMessage =
       error.response?.data?.message ||
       error.message ||

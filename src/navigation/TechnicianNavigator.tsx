@@ -1,6 +1,7 @@
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { TechnicianStackParamList } from "../types/navigation.types";
+import { ThemeProvider, technicianTheme } from "../theme";
 import { TechnicianHomeScreen } from "../screens/technician/TechnicianHomeScreen";
 import { TechnicianJobDetailsScreen } from "../screens/technician/TechnicianJobDetailsScreen";
 import { TechnicianInvoiceListScreen } from "../screens/technician/TechnicianInvoiceListScreen";
@@ -27,6 +28,7 @@ const Stack = createNativeStackNavigator<TechnicianStackParamList>();
 
 export const TechnicianNavigator = () => {
   return (
+    <ThemeProvider theme={technicianTheme}>
     <Stack.Navigator
       screenOptions={{
         headerShown: false,
@@ -55,5 +57,6 @@ export const TechnicianNavigator = () => {
       <Stack.Screen name="WorkTimer" component={WorkTimerScreen} />
       <Stack.Screen name="InvoiceGenerate" component={InvoiceGenerateScreen} />
     </Stack.Navigator>
+    </ThemeProvider>
   );
 };

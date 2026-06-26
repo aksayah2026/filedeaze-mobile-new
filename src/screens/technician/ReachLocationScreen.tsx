@@ -132,7 +132,7 @@ export const ReachLocationScreen = () => {
 
   const handleSuccessClose = () => {
     setSuccessModalVisible(false);
-    navigation.navigate("TechnicianHome");
+    navigation.navigate("TechnicianJobDetails", { jobId });
   };
 
   if (isLoading) {
