@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import AuthService from "../services/auth.service";
+import { unregisterDeviceToken } from "../services/notificationService";
 
 export type UserRole = "CUSTOMER" | "TECHNICIAN" | "ADMIN" | "SUPER_ADMIN";
 
@@ -32,7 +33,7 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       user: null,
       token: null,
       role: null,
@@ -74,6 +75,10 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: () => {
+        const token = get().token;
+        if (token) {
+          unregisterDeviceToken(token).catch(console.error);
+        }
         set({
           user: null,
           token: null,

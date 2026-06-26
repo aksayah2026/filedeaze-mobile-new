@@ -250,20 +250,18 @@ export const TechnicianJobDetailsScreen = () => {
         return;
       }
 
-      // 2. Check if the scheduled date matches today's date
-      const getTodayStr = () => {
-        const d = new Date();
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, "0");
-        const day = String(d.getDate()).padStart(2, "0");
-        return `${y}-${m}-${day}`;
-      };
-      const todayStr = getTodayStr();
-      if (job?.scheduledDateRaw !== todayStr) {
-        setAlertModalTitle("Date Mismatch");
-        setAlertModalMessage("You can only accept jobs scheduled for today.");
-        setAlertModalVisible(true);
-        return;
+      // 2. Check if the ticket was raised within the last 48 hours
+      if (job?.createdAt) {
+        const raisedTime = new Date(job.createdAt).getTime();
+        const currentTime = Date.now();
+        const hoursDifference = (currentTime - raisedTime) / (1000 * 60 * 60);
+
+        if (hoursDifference > 48) {
+          setAlertModalTitle("Time Expired");
+          setAlertModalMessage("You can only accept a ticket within 48 hours of it being raised.");
+          setAlertModalVisible(true);
+          return;
+        }
       }
     }
 

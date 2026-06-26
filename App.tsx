@@ -3,6 +3,10 @@ import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RootNavigator } from "./src/navigation";
+import { setupBackgroundNotificationHandler } from "./src/services/notificationService";
+
+// Initialize FCM background handler
+setupBackgroundNotificationHandler();
 
 // Initialize TanStack React Query Client for state management and HTTP caching
 const queryClient = new QueryClient({

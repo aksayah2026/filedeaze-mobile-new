@@ -72,8 +72,17 @@ export const TicketCard: React.FC<TicketCardProps> = ({ ticket, onPress, style }
     onPress();
   };
 
-  const todayStr = new Date().toLocaleDateString("sv-SE");
-  const isLocked = ticket.scheduledDateRaw ? ticket.scheduledDateRaw > todayStr : false;
+  let isLocked = false;
+  let lockMessage = "";
+  if (ticket.createdAt && (ticket.status === "ASSIGNED" || ticket.status === "PENDING" || ticket.status === "NEW")) {
+    const raisedTime = new Date(ticket.createdAt).getTime();
+    const currentTime = Date.now();
+    const hoursDifference = (currentTime - raisedTime) / (1000 * 60 * 60);
+    if (hoursDifference > 48) {
+      isLocked = true;
+      lockMessage = "Time Expired: You can only accept a ticket within 48 hours of it being raised.";
+    }
+  }
 
   const handlePress = () => {
     if (isLocked) {
@@ -85,7 +94,7 @@ export const TicketCard: React.FC<TicketCardProps> = ({ ticket, onPress, style }
 
   // Determine CTA text based on status
   const ctaText = isLocked
-    ? `Locked (Starts ${ticket.scheduledDate})`
+    ? `Locked (Time Expired)`
     : ticket.status === "ASSIGNED" || ticket.status === "NEW"
     ? "Accept Job"
     : ticket.status === "ACCEPTED"

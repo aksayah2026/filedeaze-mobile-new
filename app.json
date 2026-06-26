@@ -16,17 +16,37 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.fieldeaze.mobile"
+      "bundleIdentifier": "com.fieldeaze.mobile",
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "fetch",
+          "remote-notification"
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./src/assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.fieldeaze.mobile"
+      "package": "com.fieldeaze.mobile",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./src/assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "@react-native-firebase/app",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static"
+          }
+        }
+      ],
+      "@react-native-firebase/messaging"
+    ]
   }
 }

@@ -63,6 +63,7 @@ export interface Ticket {
   gstEnabled?: boolean;
   gstPercent?: number;
   closedAt?: string;
+  createdAt?: string;
 }
 
 export interface Invoice {
@@ -173,6 +174,7 @@ export function normalizeTicket(raw: any): Ticket {
     closedAt:           raw.closedAt ? String(raw.closedAt) : undefined,
     images: images.map((img: any) => img.imageUrl),
     statusLogs: raw.statusLogs ?? [],
+    createdAt: raw.createdAt ?? raw.created_at ?? undefined,
   };
 }
 

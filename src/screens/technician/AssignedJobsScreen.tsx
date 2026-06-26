@@ -270,16 +270,26 @@ export const AssignedJobsScreen = () => {
   }, [jobs, activeTab, selectedDate, invoiceTickets]);
 
   const renderJobCard = ({ item }: { item: any }) => {
-    const todayStr = getTodayStr();
-    const isLocked = item.scheduledDateRaw ? item.scheduledDateRaw > todayStr : false;
+    let isLocked = false;
+    let lockMessage = "";
+    
+    if (item.createdAt && (item.status === "ASSIGNED" || item.status === "PENDING" || item.status === "NEW")) {
+      const raisedTime = new Date(item.createdAt).getTime();
+      const currentTime = Date.now();
+      const hoursDifference = (currentTime - raisedTime) / (1000 * 60 * 60);
+      if (hoursDifference > 48) {
+        isLocked = true;
+        lockMessage = "Time Expired: You can only accept a ticket within 48 hours of it being raised.";
+      }
+    }
 
     const statusColor = getLeftBorderColor(item.status);
-    const action = isLocked ? `Locked (Starts ${item.scheduledDate})` : ACTION_LABEL[item.status as TicketStatus];
+    const action = isLocked ? `Locked (Time Expired)` : ACTION_LABEL[item.status as TicketStatus];
     const formattedDate = item.scheduledDate;
 
     const handlePress = () => {
       if (isLocked) {
-        setLockModalMessage(`This ticket is scheduled for ${item.scheduledDate}. You cannot view or accept it until that date.`);
+        setLockModalMessage(lockMessage);
         setLockModalVisible(true);
         return;
       }
