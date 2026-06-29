@@ -1,4 +1,7 @@
 import { apiClient } from "../api/client";
+import * as ImageManipulator from "expo-image-manipulator";
+import { useAuthStore } from "../store/auth.store";
+import { APP_CONFIG } from "../config/app.config";
 
 // ==========================================
 // DOMAIN TYPES (re-exported for consumers)
@@ -344,26 +347,53 @@ export class JobService {
     imageUri: string,
     type: "BEFORE" | "AFTER"
   ): Promise<{ url: string }> {
-    const formData = new FormData();
-    const filename = imageUri.split("/").pop() ?? "photo.jpg";
-    const ext = filename.split(".").pop()?.toLowerCase() ?? "jpg";
-    const mimeType = ext === "png" ? "image/png" : "image/jpeg";
+    let uploadUri = imageUri;
+    let filename = `ticket_${Date.now()}.jpg`;
+    let mimeType = "image/jpeg";
 
+    try {
+      const manipResult = await ImageManipulator.manipulateAsync(
+        imageUri,
+        [{ resize: { width: 1280 } }],
+        { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG }
+      );
+      uploadUri = manipResult.uri;
+    } catch (error) {
+      console.error("Failed to compress technician image:", error);
+    }
+
+    const formData = new FormData();
     formData.append("file", {
-      uri: imageUri,
+      uri: uploadUri,
       name: filename,
       type: mimeType,
     } as any);
 
-    const res = await apiClient.post<{ url: string }>(
-      `${BASE}/tickets/${ticketNo}/images`,
-      formData,
+    const { token } = useAuthStore.getState();
+    const headers: Record<string, string> = {
+      "x-tenant-code": APP_CONFIG.tenantCode,
+      "Accept": "application/json",
+    };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(
+      `${APP_CONFIG.apiBaseUrl}${BASE}/tickets/${ticketNo}/images?type=${type}`,
       {
-        params: { type },
-        headers: { "Content-Type": "multipart/form-data" }
+        method: "POST",
+        headers,
+        body: formData,
       }
     );
-    return res.data;
+
+    const resJson = await response.json();
+    if (!response.ok) {
+      throw new Error(resJson.message || "Failed to upload image");
+    }
+    return {
+      url: resJson.data?.imageUrl || resJson.imageUrl || "",
+    };
   }
 
   /**

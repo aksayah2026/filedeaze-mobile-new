@@ -151,7 +151,7 @@ export const StartJobScreen = () => {
   if (isLoading) {
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        <AppHeader title="Start Job" showBack onBackPress={() => navigation.goBack()} />
+        <AppHeader title="Start Job" showBack onBackPress={() => navigation.navigate("TechnicianHome")} />
         <AppLoader message="Loading ticket..." />
       </View>
     );
@@ -163,7 +163,7 @@ export const StartJobScreen = () => {
         title="Start Job"
         subtitle={ticketNo}
         showBack
-        onBackPress={() => navigation.goBack()}
+        onBackPress={() => navigation.navigate("TechnicianHome")}
       />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -298,7 +298,7 @@ export const StartJobScreen = () => {
           />
           <AppButton
             title="Go Back"
-            onPress={() => navigation.goBack()}
+            onPress={() => navigation.navigate("TechnicianHome")}
             variant="outline"
             size="lg"
           />

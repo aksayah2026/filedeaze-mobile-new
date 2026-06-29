@@ -1,23 +1,8 @@
-import { Platform } from "react-native";
-
-import Constants from "expo-constants";
-
-const getDevUrl = () => {
-  const hostUri = Constants.expoConfig?.hostUri;
-  if (!hostUri) {
-    return Platform.OS === "android" ? "http://10.0.2.2:3000/api/v1" : "http://localhost:3000/api/v1";
-  }
-  const host = hostUri.split(":")[0];
-  return `http://${host}:3000/api/v1`;
-};
-
-const devUrl = getDevUrl();
-
 export const APP_CONFIG = {
-  tenantId: "1b9f53fc-6548-4aa6-97ee-c909ad9ad444",
-  tenantCode: "abc",
-  appName: "ABC Services Ltd",
-  apiBaseUrl: devUrl,
+  tenantId: "259fc002-95ce-4a36-8f71-5745133ca370",
+  tenantCode: "vasan123",
+  appName: "vasanth@co",
+  apiBaseUrl: process.env.EXPO_PUBLIC_API_URL || "https://api-fieldeaze.ngstellar.com/api/v1",
   timeoutMs: 15000,
 };
 

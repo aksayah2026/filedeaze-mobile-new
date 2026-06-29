@@ -1,4 +1,6 @@
 import { apiClient } from "../api/client";
+import { useAuthStore } from "../store/auth.store";
+import { APP_CONFIG } from "../config/app.config";
 
 export interface Address {
   id: string;
@@ -194,12 +196,28 @@ export const CustomerService = {
       })
       .then((r) => r.data.data),
 
-  raiseTicket: (formData: FormData): Promise<any> =>
-    apiClient
-      .post("/mobile/customer/tickets", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      })
-      .then((r) => r.data.data),
+  raiseTicket: async (formData: FormData): Promise<any> => {
+    const { token } = useAuthStore.getState();
+    const headers: Record<string, string> = {
+      "x-tenant-code": APP_CONFIG.tenantCode,
+      "Accept": "application/json",
+    };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${APP_CONFIG.apiBaseUrl}/mobile/customer/tickets`, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+
+    const resJson = await response.json();
+    if (!response.ok) {
+      throw new Error(resJson.message || "Failed to raise ticket");
+    }
+    return resJson.data;
+  },
 
   getTickets: (status?: string): Promise<CustomerTicketDetail[]> =>
     apiClient

@@ -40,6 +40,7 @@ import {
   Play,
 } from "lucide-react-native";
 import * as ImagePicker from "expo-image-picker";
+import * as ImageManipulator from "expo-image-manipulator";
 import { useTheme } from "../../theme";
 import {
   useRaiseCustomerTicket,
@@ -59,6 +60,20 @@ import { AppLoader } from "../../components/AppLoader";
 import { CustomerPopup } from "../../components/CustomerPopup";
 
 type NavigationProp = NativeStackNavigationProp<CustomerStackParamList, "RaiseTicket">;
+
+const compressImage = async (uri: string): Promise<string> => {
+  try {
+    const manipResult = await ImageManipulator.manipulateAsync(
+      uri,
+      [{ resize: { width: 1280 } }],
+      { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG }
+    );
+    return manipResult.uri;
+  } catch (error) {
+    console.error("Failed to compress image:", error);
+    return uri;
+  }
+};
 
 export const RaiseTicketScreen = () => {
   const theme = useTheme();
@@ -281,6 +296,12 @@ export const RaiseTicketScreen = () => {
     });
     if (!result.canceled && result.assets[0]) {
       const asset = result.assets[0];
+      const isVideo = asset.type === "video";
+      const limit = isVideo ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
+      if (asset.fileSize && asset.fileSize > limit) {
+        triggerPopup("warning", "File Too Large", `${isVideo ? "Video" : "Image"} exceeds the maximum allowed size.`);
+        return;
+      }
       setImages((p) => [...p, { uri: asset.uri, type: (asset.type === "video" ? "video" : "image") as "image" | "video" }]);
       if (errors.images) setErrors((prev) => ({ ...prev, images: "" }));
     }
@@ -299,6 +320,10 @@ export const RaiseTicketScreen = () => {
     });
     if (!result.canceled && result.assets[0]) {
       const asset = result.assets[0];
+      if (asset.fileSize && asset.fileSize > 50 * 1024 * 1024) {
+        triggerPopup("warning", "File Too Large", "Video exceeds the maximum allowed size of 50MB.");
+        return;
+      }
       setImages((p) => [...p, { uri: asset.uri, type: "video" }]);
       if (errors.images) setErrors((prev) => ({ ...prev, images: "" }));
     }
@@ -317,7 +342,16 @@ export const RaiseTicketScreen = () => {
       selectionLimit: 5 - images.length,
     });
     if (!result.canceled) {
-      const newMedia = result.assets.map((asset) => ({
+      const validAssets = result.assets.filter((asset) => {
+        const isVideo = asset.type === "video";
+        const limit = isVideo ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
+        if (asset.fileSize && asset.fileSize > limit) {
+          triggerPopup("warning", "File Too Large", `${asset.fileName || "File"} exceeds the maximum allowed size.`);
+          return false;
+        }
+        return true;
+      });
+      const newMedia = validAssets.map((asset) => ({
         uri: asset.uri,
         type: (asset.type === "video" ? "video" : "image") as "image" | "video",
       }));
@@ -432,21 +466,54 @@ export const RaiseTicketScreen = () => {
       }
 
       // ── Media files — field name must be 'media' (FilesInterceptor) ──
-      images.forEach((item, idx) => {
-        const filename = item.uri.split("/").pop() ?? `media_${idx}.jpg`;
-        const ext = filename.split(".").pop()?.toLowerCase() ?? "jpg";
-        let mimeType = "image/jpeg";
-        if (item.type === "video") {
-          mimeType = ext === "mp4" ? "video/mp4" : ext === "mov" ? "video/quicktime" : `video/${ext}`;
-        } else {
-          mimeType = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
-        }
+      const mediaList = await Promise.all(
+        images.map(async (item, idx) => {
+          let uploadUri = item.uri;
+          let filename = item.uri.split("/").pop() ?? `media_${idx}.jpg`;
+          
+          if (item.type === "image") {
+            uploadUri = await compressImage(item.uri);
+            filename = `ticket_${Date.now()}_${idx}.jpg`;
+          }
+          
+          const ext = filename.split(".").pop()?.toLowerCase() ?? "jpg";
+          let mimeType = "image/jpeg";
+          if (item.type === "video") {
+            mimeType = ext === "mp4" ? "video/mp4" : ext === "mov" ? "video/quicktime" : `video/${ext}`;
+          } else {
+            mimeType = "image/jpeg";
+          }
+
+          return {
+            uri: uploadUri,
+            name: filename,
+            type: mimeType,
+          };
+        })
+      );
+
+      mediaList.forEach((media) => {
         formData.append("media", {
-          uri: item.uri,
-          name: filename,
-          type: mimeType,
+          uri: media.uri,
+          name: media.name,
+          type: media.type,
         } as any);
       });
+
+      // Log the final payload / FormData details before API call
+      console.log("=== SUBMITTING TICKET FORM DATA ===");
+      if ((formData as any)._parts) {
+        (formData as any)._parts.forEach(([key, val]: any) => {
+          if (key === "media") {
+            console.log(`- ${key}:`, { uri: val.uri, name: val.name, type: val.type });
+          } else {
+            console.log(`- ${key}:`, val);
+          }
+        });
+      } else {
+        console.log("- FormData object:", JSON.stringify(formData));
+      }
+      console.log("====================================");
 
       await raiseTicketMutation.mutateAsync(formData);
       setSuccessVisible(true);
@@ -567,31 +634,44 @@ export const RaiseTicketScreen = () => {
                 <Text style={{ fontSize: 12, fontWeight: "800", color: theme.colors.textMuted, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
                   Estimated Price Breakdown
                 </Text>
-                {selectedSub.serviceCharges?.length > 0 ? (() => {
-                  const base = Number(selectedSub.serviceCharges[0].amount) || 0;
-                  const gstPct = Number(selectedSub.serviceCharges[0].gstPercent ?? 18);
-                  const gstAmt = Math.round(base * gstPct / 100);
-                  const total = base + gstAmt;
+                {(() => {
+                  let serviceChargeObj = null;
+                  if (Array.isArray(selectedSub.serviceCharges) && selectedSub.serviceCharges.length > 0) {
+                    serviceChargeObj = selectedSub.serviceCharges[0];
+                  } else if (selectedSub.serviceCharges && typeof selectedSub.serviceCharges === "object") {
+                    serviceChargeObj = selectedSub.serviceCharges;
+                  }
+
+                  if (serviceChargeObj) {
+                    const base = Number(serviceChargeObj.serviceCharge ?? serviceChargeObj.amount) || 0;
+                    const gstPct = Number(serviceChargeObj.gstPercent ?? 18);
+                    const gstAmt = Math.round((base * gstPct) / 100);
+                    const total = base + gstAmt;
+                    return (
+                      <>
+                        <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
+                          <Text style={{ fontSize: 13, color: theme.colors.textMuted }}>Service Charge</Text>
+                          <Text style={{ fontSize: 13, fontWeight: "700", color: theme.colors.text }}>₹{base}</Text>
+                        </View>
+                        <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
+                          <Text style={{ fontSize: 13, color: theme.colors.textMuted }}>GST ({gstPct}%)</Text>
+                          <Text style={{ fontSize: 13, fontWeight: "700", color: theme.colors.text }}>₹{gstAmt}</Text>
+                        </View>
+                        <View style={{ height: 1, backgroundColor: theme.colors.borderLight, marginBottom: 8 }} />
+                        <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 10 }}>
+                          <Text style={{ fontSize: 14, fontWeight: "800", color: theme.colors.text }}>Total Estimated</Text>
+                          <Text style={{ fontSize: 14, fontWeight: "800", color: theme.colors.primary }}>₹{total}</Text>
+                        </View>
+                      </>
+                    );
+                  }
+
                   return (
-                    <>
-                      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
-                        <Text style={{ fontSize: 13, color: theme.colors.textMuted }}>Service Charge</Text>
-                        <Text style={{ fontSize: 13, fontWeight: "700", color: theme.colors.text }}>₹{base}</Text>
-                      </View>
-                      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
-                        <Text style={{ fontSize: 13, color: theme.colors.textMuted }}>GST ({gstPct}%)</Text>
-                        <Text style={{ fontSize: 13, fontWeight: "700", color: theme.colors.text }}>₹{gstAmt}</Text>
-                      </View>
-                      <View style={{ height: 1, backgroundColor: theme.colors.borderLight, marginBottom: 8 }} />
-                      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 10 }}>
-                        <Text style={{ fontSize: 14, fontWeight: "800", color: theme.colors.text }}>Total Estimated</Text>
-                        <Text style={{ fontSize: 14, fontWeight: "800", color: theme.colors.primary }}>₹{total}</Text>
-                      </View>
-                    </>
+                    <Text style={{ fontSize: 13, color: theme.colors.textMuted, marginBottom: 10 }}>
+                      Price to be confirmed after inspection
+                    </Text>
                   );
-                })() : (
-                  <Text style={{ fontSize: 13, color: theme.colors.textMuted, marginBottom: 10 }}>Price to be confirmed after inspection</Text>
-                )}
+                })()}
                 <View style={{ backgroundColor: `${theme.colors.warning}12`, borderRadius: 8, padding: 8, flexDirection: "row", gap: 6 }}>
                   <Text style={{ fontSize: 10 }}>⚠️</Text>
                   <Text style={{ fontSize: 11, color: theme.colors.textMuted, flex: 1, lineHeight: 16 }}>
