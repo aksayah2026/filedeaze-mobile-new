@@ -41,6 +41,16 @@ export function useUpdateCustomerProfile() {
   });
 }
 
+export function useUploadCustomerProfilePhoto() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (formData: FormData) => CustomerService.uploadProfilePhoto(formData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: customerKeys.profile() });
+    },
+  });
+}
+
 export function useRaiseCustomerTicket() {
   const queryClient = useQueryClient();
   return useMutation({

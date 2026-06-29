@@ -39,6 +39,7 @@ export interface CustomerProfileData {
   address: string | null;
   city: string | null;
   pincode: string | null;
+  profileImageUrl?: string | null;
   _count?: {
     tickets: number;
     feedback: number;
@@ -185,6 +186,13 @@ export const CustomerService = {
 
   updateProfile: (payload: Partial<CustomerProfileData>): Promise<CustomerProfileData> =>
     apiClient.patch("/mobile/customer/profile", payload).then((r) => r.data.data),
+
+  uploadProfilePhoto: (formData: FormData): Promise<{ profileImageUrl: string }> =>
+    apiClient
+      .post("/mobile/customer/profile/photo", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+      .then((r) => r.data.data),
 
   raiseTicket: (formData: FormData): Promise<any> =>
     apiClient

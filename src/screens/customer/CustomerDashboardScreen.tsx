@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl } from "r
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Plus, Ticket, ClipboardCheck, FileText, ArrowRight, LogOut, User } from "lucide-react-native";
+import { Image } from "react-native";
 import { useTheme } from "../../theme";
 import { useCustomerDashboard } from "../../hooks/useCustomer";
 import { CustomerStackParamList } from "../../types/navigation.types";
@@ -47,8 +48,12 @@ export const CustomerDashboardScreen = () => {
 
       {/* Welcome Banner */}
       <View style={[styles.profileBanner, { backgroundColor: theme.colors.card, borderBottomWidth: 1, borderBottomColor: theme.colors.borderLight }]}>
-        <View style={[styles.avatarCircle, { backgroundColor: `${theme.colors.primary}15` }]}>
-          <User color={theme.colors.primary} size={24} />
+        <View style={[styles.avatarCircle, { backgroundColor: `${theme.colors.primary}15`, overflow: 'hidden' }]}>
+          {user?.avatar ? (
+            <Image source={{ uri: user.avatar }} style={{ width: '100%', height: '100%' }} />
+          ) : (
+            <User color={theme.colors.primary} size={24} />
+          )}
         </View>
         <View style={styles.profileText}>
           <Text style={{ color: theme.colors.textMuted, fontSize: theme.typography.fontSize.xs, textTransform: "uppercase", letterSpacing: 0.5 }}>

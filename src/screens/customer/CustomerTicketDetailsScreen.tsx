@@ -130,6 +130,7 @@ export const CustomerTicketDetailsScreen = () => {
   };
 
   // Conditions
+  const isCancelled = ticket.status === "CANCELLED";
   const isCancellable = ["NEW_TICKET", "ASSIGNED", "ACCEPTED"].includes(ticket.status);
   const isTrackable = ["TRAVELLING", "REACHED_LOCATION", "IN_PROGRESS", "COMPLETED", "INVOICE_GENERATED", "TICKET_CLOSED", "CLOSED"].includes(ticket.status);
   const isClosed = ["COMPLETED", "INVOICE_GENERATED", "TICKET_CLOSED", "CLOSED"].includes(ticket.status);
@@ -189,8 +190,22 @@ export const CustomerTicketDetailsScreen = () => {
           </Text>
         </View>
 
+        {/* Cancellation notice */}
+        {isCancelled && (
+          <View style={[styles.cancelledBanner, { backgroundColor: `${theme.colors.danger}0d`, borderColor: `${theme.colors.danger}30` }]}>
+            <XCircle size={18} color={theme.colors.danger} />
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <Text style={[styles.cancelledBannerTitle, { color: theme.colors.danger }]}>Ticket Cancelled</Text>
+              <Text style={[styles.cancelledBannerSub, { color: theme.colors.textMuted }]}>
+                This service request has been cancelled. Assigned expert, schedule, and site details have been cleared.
+              </Text>
+            </View>
+          </View>
+        )}
+
         {/* Assigned Technician Profile */}
-        <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>Assigned Technician</Text>
+        {!isCancelled && (
+        <><Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>Assigned Technician</Text>
         <View style={[styles.premiumCard, { backgroundColor: theme.colors.card }]}>
           {ticket.technician ? (
             <View style={styles.techRow}>
@@ -266,6 +281,8 @@ export const CustomerTicketDetailsScreen = () => {
             </View>
           </View>
         </View>
+        </>
+        )}
 
         {/* Feedback Section (if completed) */}
         {isClosed && (
@@ -636,6 +653,23 @@ const styles = StyleSheet.create({
   starsRow: {
     flexDirection: "row",
     gap: 4,
+  },
+  cancelledBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+  },
+  cancelledBannerTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    marginBottom: 3,
+  },
+  cancelledBannerSub: {
+    fontSize: 12,
+    lineHeight: 17,
   },
 });
 

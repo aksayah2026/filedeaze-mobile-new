@@ -12,7 +12,9 @@ import {
   Platform,
   Image,
   TextInput,
+  TouchableOpacity,
 } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
@@ -34,6 +36,7 @@ import {
   Search,
   Bell,
   Sparkles,
+  UserCheck,
 } from "lucide-react-native";
 
 import { useTheme } from "../../theme";
@@ -43,6 +46,7 @@ import {
   useCustomerInvoices,
   useCustomerProfile,
   useUpdateCustomerProfile,
+  useUploadCustomerProfilePhoto,
   useCustomerPayments,
   useCategories,
 } from "../../hooks/useCustomer";
@@ -66,7 +70,7 @@ type CustomerTab = "HOME" | "TICKETS" | "INVOICES" | "PROFILE" | "PAYMENTS";
 export const CustomerHomeScreen = () => {
   const theme = useTheme();
   const navigation = useNavigation<NavigationProp>();
-  const { user, logout } = useAuthStore();
+  const { user, logout, updateAvatar } = useAuthStore();
 
   const [activeTab, setActiveTab] = useState<CustomerTab>("HOME");
   const [logoutPopupVisible, setLogoutPopupVisible] = useState(false);
@@ -103,6 +107,7 @@ export const CustomerHomeScreen = () => {
     refetch: refetchProfile,
   } = useCustomerProfile();
   const updateProfileMutation = useUpdateCustomerProfile();
+  const uploadPhotoMutation = useUploadCustomerProfilePhoto();
 
   // Form states
   const [name, setName] = useState("");
@@ -161,6 +166,42 @@ export const CustomerHomeScreen = () => {
         },
       },
     );
+  };
+
+  const handlePickPhoto = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.5,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        const formData = new FormData();
+        formData.append("photo", {
+          uri: Platform.OS === "ios" ? asset.uri.replace("file://", "") : asset.uri,
+          type: asset.mimeType || "image/jpeg",
+          name: asset.fileName || "profile_photo.jpg",
+        } as any);
+
+        uploadPhotoMutation.mutate(formData, {
+          onSuccess: (data: any) => {
+            if (data?.profileImageUrl) {
+              updateAvatar(data.profileImageUrl);
+            }
+            Alert.alert("Success", "Profile photo updated successfully");
+          },
+          onError: (err: any) => {
+            Alert.alert("Error", err.message || "Failed to update profile photo");
+          },
+        });
+      }
+    } catch (error) {
+      console.log("Error picking image:", error);
+      Alert.alert("Error", "Could not pick image");
+    }
   };
 
   const getStatusVariant = (status: string) => {
@@ -607,7 +648,20 @@ export const CustomerHomeScreen = () => {
                   <Text style={[styles.cardTitle, { color: theme.colors.text, fontSize: 15 }]}>
                     {tickets[0].subCategory?.name || tickets[0].subCategory?.category?.name || "—"}
                   </Text>
-                  <View style={styles.timeInfo}>
+
+                  {/* Assigning expert notice */}
+                  {["NEW_TICKET", "ASSIGNED"].includes(tickets[0].status) && (
+                    <View style={[styles.assigningBanner, { backgroundColor: `${theme.colors.primary}0e`, borderColor: `${theme.colors.primary}25` }]}>
+                      <UserCheck size={14} color={theme.colors.primary} />
+                      <Text style={[styles.assigningText, { color: theme.colors.primary }]}>
+                        {tickets[0].status === "ASSIGNED"
+                          ? "Expert assigned — confirming your appointment"
+                          : "Finding the best expert for you…"}
+                      </Text>
+                    </View>
+                  )}
+
+                  <View style={[styles.timeInfo, { marginTop: 8 }]}>
                     <Calendar size={13} color={theme.colors.textMuted} style={{ marginRight: 5 }} />
                     <Text style={{ fontSize: 12, color: theme.colors.textMuted }}>{formatDate(tickets[0].createdAt)}</Text>
                   </View>
@@ -1013,6 +1067,31 @@ export const CustomerHomeScreen = () => {
                 </Pressable>
               </View>
 
+              <View style={{ alignItems: "center", marginBottom: 24 }}>
+                <View style={[styles.avatarCircleLg, { backgroundColor: `${theme.colors.primary}15` }]}>
+                  {(profile?.profileImageUrl || user?.avatar) ? (
+                    <Image
+                      source={{ uri: profile?.profileImageUrl || user?.avatar }}
+                      style={styles.avatarImageLg}
+                    />
+                  ) : (
+                    <User color={theme.colors.primary} size={40} />
+                  )}
+                </View>
+                {isEditingProfile && (
+                  <TouchableOpacity
+                    style={[styles.editPhotoBtn, { backgroundColor: theme.colors.primary }]}
+                    onPress={handlePickPhoto}
+                    disabled={uploadPhotoMutation.isPending}
+                  >
+                    <Edit2 size={12} color="#fff" />
+                    <Text style={{ color: "#fff", fontSize: 12, marginLeft: 4, fontWeight: "600" }}>
+                      {uploadPhotoMutation.isPending ? "Uploading..." : "Change Photo"}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
               <AppInput
                 label="Name"
                 value={name}
@@ -1284,6 +1363,28 @@ const styles = StyleSheet.create({
     shadowOpacity: 1,
     shadowRadius: 10,
     elevation: 3,
+  },
+  avatarCircleLg: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "hidden",
+  },
+  avatarImageLg: {
+    width: "100%",
+    height: "100%",
+  },
+  editPhotoBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginTop: -12,
+    borderWidth: 2,
+    borderColor: "#fff",
   },
   label: {
     fontSize: 13,
@@ -1694,6 +1795,22 @@ const styles = StyleSheet.create({
   recentCard: {
     borderRadius: 16,
     padding: 16,
+  },
+  assigningBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    marginTop: 8,
+  },
+  assigningText: {
+    fontSize: 12,
+    fontWeight: "600",
+    flex: 1,
+    lineHeight: 16,
   },
 });
 

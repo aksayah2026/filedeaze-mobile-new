@@ -14,6 +14,7 @@ export type AuthStackParamList = {
 };
 
 export type CustomerStackParamList = {
+  PostLoginSplash: undefined;
   CustomerHome: undefined;
   CustomerJobDetails: { jobId: string };
   CustomerDashboard: undefined;
@@ -29,6 +30,7 @@ export type CustomerStackParamList = {
 };
 
 export type TechnicianStackParamList = {
+  PostLoginSplash: undefined;
   TechnicianHome: undefined;
   TechnicianJobDetails: { jobId: string };
   TechnicianInvoiceList: undefined;

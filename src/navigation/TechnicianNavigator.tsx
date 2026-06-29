@@ -23,6 +23,7 @@ import { CheckOutScreen } from "../screens/technician/CheckOutScreen";
 import { TravelTrackingScreen } from "../screens/technician/TravelTrackingScreen";
 import { WorkTimerScreen } from "../screens/technician/WorkTimerScreen";
 import { InvoiceGenerateScreen } from "../screens/technician/InvoiceGenerateScreen";
+import { PostLoginSplashScreen } from "../screens/auth/PostLoginSplashScreen";
 
 const Stack = createNativeStackNavigator<TechnicianStackParamList>();
 
@@ -30,11 +31,13 @@ export const TechnicianNavigator = () => {
   return (
     <ThemeProvider theme={technicianTheme}>
     <Stack.Navigator
+      initialRouteName="PostLoginSplash"
       screenOptions={{
         headerShown: false,
         animation: "slide_from_right",
       }}
     >
+      <Stack.Screen name="PostLoginSplash" component={PostLoginSplashScreen} options={{ animation: "fade" }} />
       <Stack.Screen name="TechnicianHome" component={TechnicianHomeScreen} />
       <Stack.Screen name="TechnicianJobDetails" component={TechnicianJobDetailsScreen} />
       <Stack.Screen name="TechnicianInvoiceList" component={TechnicianInvoiceListScreen} />

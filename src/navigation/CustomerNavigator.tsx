@@ -15,18 +15,20 @@ import { AddressBookScreen } from "../screens/customer/AddressBookScreen";
 
 import { CustomerHomeScreen } from "../screens/customer/CustomerHomeScreen";
 import { CustomerJobDetailsScreen } from "../screens/customer/CustomerJobDetailsScreen";
+import { PostLoginSplashScreen } from "../screens/auth/PostLoginSplashScreen";
 
 const Stack = createNativeStackNavigator<CustomerStackParamList>();
 
 export const CustomerNavigator = () => {
   return (
     <Stack.Navigator
-      initialRouteName="CustomerHome"
+      initialRouteName="PostLoginSplash"
       screenOptions={{
         headerShown: false,
         animation: "slide_from_right",
       }}
     >
+      <Stack.Screen name="PostLoginSplash" component={PostLoginSplashScreen} options={{ animation: "fade" }} />
       <Stack.Screen name="CustomerDashboard" component={CustomerDashboardScreen} />
       <Stack.Screen name="RaiseTicket" component={RaiseTicketScreen} />
       <Stack.Screen name="TicketHistory" component={TicketHistoryScreen} />

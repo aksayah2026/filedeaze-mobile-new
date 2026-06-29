@@ -29,6 +29,7 @@ interface AuthState {
   logout: () => void;
   clearError: () => void;
   setHasHydrated: (val: boolean) => void;
+  updateAvatar: (url: string) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -43,6 +44,7 @@ export const useAuthStore = create<AuthState>()(
       _hasHydrated: false,
 
       setHasHydrated: (val: boolean) => set({ _hasHydrated: val }),
+      updateAvatar: (url: string) => set((state) => ({ user: state.user ? { ...state.user, avatar: url } : null })),
 
       login: async (email, password) => {
         set({ isLoading: true, error: null });
