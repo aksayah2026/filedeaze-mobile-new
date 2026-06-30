@@ -35,9 +35,19 @@ export const OtpVerificationScreen = () => {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProps>();
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendCountdown, setResendCountdown] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
-  const { email, mode, address } = route.params;
+  const { email, mode, address, tenantId } = route.params;
+
+  React.useEffect(() => {
+    if (resendCountdown === 0) return;
+    const interval = setInterval(() => {
+      setResendCountdown((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [resendCountdown]);
 
   const {
     control,
@@ -51,11 +61,12 @@ export const OtpVerificationScreen = () => {
   });
 
   const onSubmit = async (data: OtpInput) => {
+    if (loading) return;
     setLoading(true);
     setError(null);
     try {
       if (mode === "register") {
-        const loginRes = await AuthService.verifyOtp(email, data.otp);
+        const loginRes = await AuthService.verifyOtp(email, data.otp, tenantId);
         // Save address using the token returned by the verification endpoint
         if (address) {
           try {
@@ -107,16 +118,22 @@ export const OtpVerificationScreen = () => {
   };
 
   const handleResendOtp = async () => {
+    if (resending || resendCountdown > 0) return;
+    setResending(true);
     setError(null);
     try {
       if (mode === "forgot_password") {
-        await AuthService.forgotPassword(email);
+        await AuthService.forgotPassword(email, tenantId);
       } else {
-        await AuthService.resendOtp(email);
+        await AuthService.resendOtp(email, tenantId);
       }
       Alert.alert("Code Resent", "A new OTP code has been dispatched to your email address.");
+      setResendCountdown(30);
     } catch (err: any) {
       setError(err?.message || "Failed to resend verification code.");
+      Alert.alert("Error", err?.message || "Failed to resend verification code.");
+    } finally {
+      setResending(false);
     }
   };
 
@@ -181,9 +198,21 @@ export const OtpVerificationScreen = () => {
             style={{ marginTop: 16 }}
           />
 
-          <Pressable onPress={handleResendOtp} style={{ marginTop: 16, alignItems: "center" }}>
+          <Pressable
+            disabled={resending || resendCountdown > 0}
+            onPress={handleResendOtp}
+            style={({ pressed }) => [
+              { marginTop: 16, alignItems: "center" },
+              (resending || resendCountdown > 0) && { opacity: 0.5 },
+              pressed && !(resending || resendCountdown > 0) && { opacity: 0.7 }
+            ]}
+          >
             <Text style={{ fontSize: 13, color: theme.colors.primary, fontWeight: "600" }}>
-              Resend Verification Code
+              {resending
+                ? "Resending..."
+                : resendCountdown > 0
+                  ? `Resend Code in ${resendCountdown}s`
+                  : "Resend Verification Code"}
             </Text>
           </Pressable>
         </AppCard>

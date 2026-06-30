@@ -23,6 +23,7 @@ import { AuthStackParamList } from "../../types/navigation.types";
 import { AppInput } from "../../components/AppInput";
 import { AppButton } from "../../components/AppButton";
 import { AppCard } from "../../components/AppCard";
+import { APP_CONFIG } from "../../config/app.config";
 
 type NavigationProp = NativeStackNavigationProp<AuthStackParamList, "Register">;
 
@@ -50,23 +51,30 @@ export const RegisterScreen = () => {
   });
 
   const onSubmit = async (data: RegisterInput) => {
+    if (loading) return;
     setLoading(true);
     setError(null);
     try {
-      const response = await AuthService.registerCustomer({
+      const formattedMobile = `+91${data.mobile}`;
+      await AuthService.registerCustomer({
         name: data.name,
         email: data.email,
-        mobile: data.mobile,
+        mobile: formattedMobile,
         password: data.password,
       });
       setLoading(false);
+      Alert.alert(
+        "Verification Required",
+        "An OTP code has been sent to your email address. Please verify to activate your account."
+      );
       navigation.navigate("OtpVerification", {
         email: data.email,
-        mobile: data.mobile,
+        mobile: formattedMobile,
         mode: "register",
         name: data.name,
         password: data.password,
         address: data.address,
+        tenantId: APP_CONFIG.tenantId,
       });
     } catch (err: any) {
       setLoading(false);

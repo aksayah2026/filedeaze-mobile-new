@@ -10,6 +10,7 @@ export type AuthStackParamList = {
     name?: string;
     password?: string;
     address?: string;
+    tenantId?: string;
   };
 };
 

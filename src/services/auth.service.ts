@@ -118,10 +118,10 @@ export class AuthService {
   /**
    * Customer OTP Verification
    */
-  static async verifyOtp(email: string, otp: string): Promise<LoginResponse> {
+  static async verifyOtp(email: string, otp: string, tenantId?: string): Promise<LoginResponse> {
     try {
       const response = await apiClient.post("/auth/customer/verify-otp", {
-        tenantId: APP_CONFIG.tenantId,
+        tenantId: tenantId || APP_CONFIG.tenantId,
         email,
         otp,
       });
@@ -148,10 +148,10 @@ export class AuthService {
   /**
    * Resend OTP
    */
-  static async resendOtp(email: string): Promise<{ message: string }> {
+  static async resendOtp(email: string, tenantId?: string): Promise<{ message: string }> {
     try {
       const response = await apiClient.post("/auth/customer/resend-otp", {
-        tenantId: APP_CONFIG.tenantId,
+        tenantId: tenantId || APP_CONFIG.tenantId,
         email,
       });
 
@@ -167,10 +167,10 @@ export class AuthService {
   /**
    * Customer Forgot Password
    */
-  static async forgotPassword(email: string): Promise<{ message: string }> {
+  static async forgotPassword(email: string, tenantId?: string): Promise<{ message: string }> {
     try {
       const response = await apiClient.post("/auth/customer/forgot-password", {
-        tenantId: APP_CONFIG.tenantId,
+        tenantId: tenantId || APP_CONFIG.tenantId,
         email,
       });
 

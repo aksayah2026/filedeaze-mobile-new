@@ -373,616 +373,402 @@ export const CustomerHomeScreen = () => {
   };
 
   return (
-    <View
-      style={[styles.container, { backgroundColor: theme.colors.background }]}
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      style={{ flex: 1 }}
     >
-      <AppHeader
-        showTenantBranding
-        leftAction={null}
-      />
-
-      {/* Reusable Customer Logout Popup */}
-      <CustomerPopup
-        visible={logoutPopupVisible}
-        type="warning"
-        title="Logout Confirmation"
-        message="Are you sure you want to logout?"
-        confirmText="OK"
-        cancelText="Cancel"
-        onConfirm={() => {
-          setLogoutPopupVisible(false);
-          logout();
-        }}
-        onCancel={() => setLogoutPopupVisible(false)}
-      />
-
-      {/* Drawer Removed */}
-
-      {/* Main Content View below header & Customer Account Banner */}
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing()}
-            onRefresh={handleRefresh}
-            tintColor={theme.colors.primary}
-          />
-        }
+      <View
+        style={[styles.container, { backgroundColor: theme.colors.background }]}
       >
-        {activeTab === "HOME" && (
-          <View>
-            {/* Location Bar */}
-            <View style={[styles.locationBar, { backgroundColor: theme.colors.card }]}>
-              <View style={styles.locationLeft}>
-                <MapPin size={16} color={theme.colors.primary} />
-                <View style={{ marginLeft: 8, flex: 1 }}>
-                  <Text style={[styles.locationLabel, { color: theme.colors.textMuted }]}>Your Location</Text>
-                  <Text style={[styles.locationAddr, { color: theme.colors.text }]} numberOfLines={1}>
-                    {profile?.address
-                      ? [profile.address, profile.city].filter(Boolean).join(", ")
-                      : "Set your address"}
-                  </Text>
-                </View>
-              </View>
-              <View style={[styles.locationBellBtn, { backgroundColor: `${theme.colors.primary}14` }]}>
-                <Bell size={19} color={theme.colors.primary} />
-              </View>
-            </View>
+        <AppHeader
+          showTenantBranding={activeTab !== "PROFILE"}
+          showBack={activeTab === "PROFILE"}
+          onBackPress={() => {
+            if (navigation.canGoBack()) {
+              navigation.goBack();
+            } else {
+              setActiveTab("HOME");
+            }
+          }}
+          title={activeTab === "PROFILE" ? "Profile Details" : undefined}
+        />
 
-            {/* Search Bar + Dropdown */}
-            <View style={[styles.homeSearchWrap, { zIndex: 100, elevation: 100 }]}>
-              <View style={{ position: "relative" }}>
-              <View style={[styles.homeSearchBar, { backgroundColor: theme.colors.background, borderColor: searchQuery ? theme.colors.primary : theme.colors.borderLight }]}>
-                <Search size={17} color={searchQuery ? theme.colors.primary : theme.colors.textLight} />
-                <TextInput
-                  style={[styles.homeSearchInput, { color: theme.colors.text }]}
-                  placeholder="Search for services..."
-                  placeholderTextColor={theme.colors.textLight}
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                  returnKeyType="search"
-                  autoCapitalize="none"
-                />
-                {searchQuery.length > 0 && (
-                  <Pressable onPress={() => setSearchQuery("")} style={{ padding: 4 }}>
-                    <Text style={{ color: theme.colors.textMuted, fontSize: 16, lineHeight: 18 }}>✕</Text>
-                  </Pressable>
-                )}
-              </View>
-              {/* Search Dropdown */}
-              {searchQuery.length > 0 && (
-                <View style={[styles.searchDropdown, { backgroundColor: theme.colors.card, borderColor: theme.colors.borderLight }]}>
-                  {(() => {
-                    const results = categories.filter((c: any) =>
-                      c.name.toLowerCase().includes(searchQuery.toLowerCase())
-                    );
-                    if (results.length === 0) {
-                      return (
-                        <View style={{ padding: 18, alignItems: "center" }}>
-                          <Text style={{ color: theme.colors.textMuted, fontSize: 13 }}>No services found for "{searchQuery}"</Text>
-                        </View>
-                      );
-                    }
-                    return results.slice(0, 7).map((cat: any, idx: number) => (
-                      <Pressable
-                        key={cat.id}
-                        style={({ pressed }) => [
-                          styles.searchDropdownItem,
-                          { borderBottomColor: theme.colors.borderLight },
-                          idx === results.slice(0, 7).length - 1 && { borderBottomWidth: 0 },
-                          pressed && { backgroundColor: `${theme.colors.primary}10` },
-                        ]}
-                        onPress={() => {
-                          setSearchQuery("");
-                          navigation.navigate("RaiseTicket", { categoryId: cat.id, categoryName: cat.name });
-                        }}
-                      >
-                        <Image source={{ uri: getCatImage(cat.name) }} style={styles.searchDropdownImg} resizeMode="cover" />
-                        <Text style={[styles.searchDropdownName, { color: theme.colors.text }]} numberOfLines={1}>{cat.name}</Text>
-                        <ChevronRight size={14} color={theme.colors.textMuted} />
-                      </Pressable>
-                    ));
-                  })()}
-                </View>
-              )}
-              </View>
-            </View>
+        {/* Reusable Customer Logout Popup */}
+        <CustomerPopup
+          visible={logoutPopupVisible}
+          type="warning"
+          title="Logout Confirmation"
+          message="Are you sure you want to logout?"
+          confirmText="OK"
+          cancelText="Cancel"
+          onConfirm={() => {
+            setLogoutPopupVisible(false);
+            logout();
+          }}
+          onCancel={() => setLogoutPopupVisible(false)}
+        />
 
-            {/* Featured Services Banner Carousel */}
-            {!isCategoriesLoading && categories.length > 0 && (
-              <View style={styles.featuredSection}>
-                <Text style={[styles.featuredLabel, { color: theme.colors.textMuted }]}>Popular Services</Text>
-                <View style={{ position: "relative" }}>
-                  <ScrollView
-                    ref={featuredScrollRef}
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.featuredList}
-                    decelerationRate="fast"
-                    snapToInterval={FEATURED_CARD_W + 12}
-                    snapToAlignment="start"
-                    scrollEventThrottle={16}
-                  >
-                    {categories.slice(0, 5).map((cat: any) => (
-                      <LinearGradient
-                        key={cat.id}
-                        colors={getCatBannerGrad(cat.name)}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0.6 }}
-                        style={[styles.featuredBannerCard, { width: FEATURED_CARD_W }]}
-                      >
-                        <View style={styles.featuredBannerLeft}>
-                          <View style={styles.featuredBannerTagRow}>
-                            <Text style={styles.featuredBannerStar}>⭐</Text>
-                            <Text style={styles.featuredBannerTag}>TOP SERVICE</Text>
-                          </View>
-                          <Text style={styles.featuredBannerName} numberOfLines={2}>{cat.name}</Text>
-                          <Text style={styles.featuredBannerSub}>Experts at your doorstep</Text>
-                          <Pressable
-                            style={[styles.featuredBannerBtn, { backgroundColor: theme.colors.primary }]}
-                            onPress={() => navigation.navigate("RaiseTicket", { categoryId: cat.id, categoryName: cat.name })}
-                          >
-                            <Text style={styles.featuredBannerBtnText}>Book Now</Text>
-                          </Pressable>
-                        </View>
-                        <Image
-                          source={{ uri: getCatImage(cat.name) }}
-                          style={styles.featuredBannerImg}
-                          resizeMode="cover"
-                        />
-                      </LinearGradient>
-                    ))}
-                  </ScrollView>
-                  {/* Dots overlaid at bottom of carousel */}
-                  <View pointerEvents="none" style={styles.featuredDots}>
-                    {categories.slice(0, 5).map((_: any, i: number) => (
-                      <View
-                        key={i}
-                        style={[
-                          styles.featuredDot,
-                          {
-                            backgroundColor: i === featuredDotIdx ? "#ffffff" : "rgba(255,255,255,0.35)",
-                            width: i === featuredDotIdx ? 20 : 6,
-                          },
-                        ]}
-                      />
-                    ))}
+        {/* Drawer Removed */}
+
+        {/* Main Content View below header & Customer Account Banner */}
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing()}
+              onRefresh={handleRefresh}
+              tintColor={theme.colors.primary}
+            />
+          }
+        >
+          {activeTab === "HOME" && (
+            <View>
+              {/* Location Bar */}
+              <View style={[styles.locationBar, { backgroundColor: theme.colors.card }]}>
+                <View style={styles.locationLeft}>
+                  <MapPin size={16} color={theme.colors.primary} />
+                  <View style={{ marginLeft: 8, flex: 1 }}>
+                    <Text style={[styles.locationLabel, { color: theme.colors.textMuted }]}>Your Location</Text>
+                    <Text style={[styles.locationAddr, { color: theme.colors.text }]} numberOfLines={1}>
+                      {profile?.address
+                        ? [profile.address, profile.city].filter(Boolean).join(", ")
+                        : "Set your address"}
+                    </Text>
                   </View>
                 </View>
-              </View>
-            )}
-
-            {/* Promo Chips */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.promoChipRow}>
-              {[
-                { label: "⚡ Quick Book", color: "#F97316" },
-                { label: "🎁 20% OFF Today", color: "#7C3AED" },
-                { label: "⭐ Top Rated", color: "#0EA5E9" },
-                { label: "✅ Verified Pros", color: "#059669" },
-              ].map((chip, i) => (
-                <View key={i} style={[styles.promoChip, { backgroundColor: `${chip.color}14`, borderColor: `${chip.color}35` }]}>
-                  <Text style={[styles.promoChipText, { color: chip.color }]}>{chip.label}</Text>
+                <View style={[styles.locationBellBtn, { backgroundColor: `${theme.colors.primary}14` }]}>
+                  <Bell size={19} color={theme.colors.primary} />
                 </View>
-              ))}
-            </ScrollView>
-
-            {/* Services Grid */}
-            <View style={styles.serviceSection}>
-              <View style={styles.sectionHeaderRow}>
-                <Text style={[styles.sectionHeading, { color: theme.colors.text }]}>Explore all services</Text>
-                <Sparkles size={15} color={theme.colors.primary} />
               </View>
-              {isCategoriesLoading ? (
-                <AppLoader message="Loading..." />
-              ) : (
-                <>
-                  <View style={styles.catGridUC}>
-                    {categories.slice(0, showAllCats ? categories.length : 6).map((cat: any) => (
-                      <Pressable
-                        key={cat.id}
-                        style={({ pressed }) => [
-                          styles.catCardUC,
-                          { backgroundColor: theme.colors.card, width: CAT_CARD_W },
-                          pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] },
-                        ]}
-                        onPress={() => navigation.navigate("RaiseTicket", { categoryId: cat.id, categoryName: cat.name })}
-                      >
-                        <View style={[styles.catImageWrap, { backgroundColor: theme.colors.background }]}>
+
+              {/* Search Bar + Dropdown */}
+              <View style={[styles.homeSearchWrap, { zIndex: 100, elevation: 100 }]}>
+                <View style={{ position: "relative" }}>
+                  <View style={[styles.homeSearchBar, { backgroundColor: theme.colors.background, borderColor: searchQuery ? theme.colors.primary : theme.colors.borderLight }]}>
+                    <Search size={17} color={searchQuery ? theme.colors.primary : theme.colors.textLight} />
+                    <TextInput
+                      style={[styles.homeSearchInput, { color: theme.colors.text }]}
+                      placeholder="Search for services..."
+                      placeholderTextColor={theme.colors.textLight}
+                      value={searchQuery}
+                      onChangeText={setSearchQuery}
+                      returnKeyType="search"
+                      autoCapitalize="none"
+                    />
+                    {searchQuery.length > 0 && (
+                      <Pressable onPress={() => setSearchQuery("")} style={{ padding: 4 }}>
+                        <Text style={{ color: theme.colors.textMuted, fontSize: 16, lineHeight: 18 }}>✕</Text>
+                      </Pressable>
+                    )}
+                  </View>
+                  {/* Search Dropdown */}
+                  {searchQuery.length > 0 && (
+                    <View style={[styles.searchDropdown, { backgroundColor: theme.colors.card, borderColor: theme.colors.borderLight }]}>
+                      {(() => {
+                        const results = categories.filter((c: any) =>
+                          c.name.toLowerCase().includes(searchQuery.toLowerCase())
+                        );
+                        if (results.length === 0) {
+                          return (
+                            <View style={{ padding: 18, alignItems: "center" }}>
+                              <Text style={{ color: theme.colors.textMuted, fontSize: 13 }}>No services found for "{searchQuery}"</Text>
+                            </View>
+                          );
+                        }
+                        return results.slice(0, 7).map((cat: any, idx: number) => (
+                          <Pressable
+                            key={cat.id}
+                            style={({ pressed }) => [
+                              styles.searchDropdownItem,
+                              { borderBottomColor: theme.colors.borderLight },
+                              idx === results.slice(0, 7).length - 1 && { borderBottomWidth: 0 },
+                              pressed && { backgroundColor: `${theme.colors.primary}10` },
+                            ]}
+                            onPress={() => {
+                              setSearchQuery("");
+                              navigation.navigate("RaiseTicket", { categoryId: cat.id, categoryName: cat.name });
+                            }}
+                          >
+                            <Image source={{ uri: getCatImage(cat.name) }} style={styles.searchDropdownImg} resizeMode="cover" />
+                            <Text style={[styles.searchDropdownName, { color: theme.colors.text }]} numberOfLines={1}>{cat.name}</Text>
+                            <ChevronRight size={14} color={theme.colors.textMuted} />
+                          </Pressable>
+                        ));
+                      })()}
+                    </View>
+                  )}
+                </View>
+              </View>
+
+              {/* Featured Services Banner Carousel */}
+              {!isCategoriesLoading && categories.length > 0 && (
+                <View style={styles.featuredSection}>
+                  <Text style={[styles.featuredLabel, { color: theme.colors.textMuted }]}>Popular Services</Text>
+                  <View style={{ position: "relative" }}>
+                    <ScrollView
+                      ref={featuredScrollRef}
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.featuredList}
+                      decelerationRate="fast"
+                      snapToInterval={FEATURED_CARD_W + 12}
+                      snapToAlignment="start"
+                      scrollEventThrottle={16}
+                    >
+                      {categories.slice(0, 5).map((cat: any) => (
+                        <LinearGradient
+                          key={cat.id}
+                          colors={getCatBannerGrad(cat.name)}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 0.6 }}
+                          style={[styles.featuredBannerCard, { width: FEATURED_CARD_W }]}
+                        >
+                          <View style={styles.featuredBannerLeft}>
+                            <View style={styles.featuredBannerTagRow}>
+                              <Text style={styles.featuredBannerStar}>⭐</Text>
+                              <Text style={styles.featuredBannerTag}>TOP SERVICE</Text>
+                            </View>
+                            <Text style={styles.featuredBannerName} numberOfLines={2}>{cat.name}</Text>
+                            <Text style={styles.featuredBannerSub}>Experts at your doorstep</Text>
+                            <Pressable
+                              style={[styles.featuredBannerBtn, { backgroundColor: theme.colors.primary }]}
+                              onPress={() => navigation.navigate("RaiseTicket", { categoryId: cat.id, categoryName: cat.name })}
+                            >
+                              <Text style={styles.featuredBannerBtnText}>Book Now</Text>
+                            </Pressable>
+                          </View>
                           <Image
                             source={{ uri: getCatImage(cat.name) }}
-                            style={styles.catImage}
+                            style={styles.featuredBannerImg}
                             resizeMode="cover"
                           />
-                        </View>
-                        <Text style={[styles.catNameUC, { color: theme.colors.text }]} numberOfLines={2}>
-                          {cat.name}
+                        </LinearGradient>
+                      ))}
+                    </ScrollView>
+                    {/* Dots overlaid at bottom of carousel */}
+                    <View pointerEvents="none" style={styles.featuredDots}>
+                      {categories.slice(0, 5).map((_: any, i: number) => (
+                        <View
+                          key={i}
+                          style={[
+                            styles.featuredDot,
+                            {
+                              backgroundColor: i === featuredDotIdx ? "#ffffff" : "rgba(255,255,255,0.35)",
+                              width: i === featuredDotIdx ? 20 : 6,
+                            },
+                          ]}
+                        />
+                      ))}
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {/* Promo Chips */}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.promoChipRow}>
+                {[
+                  { label: "⚡ Quick Book", color: "#F97316" },
+                  { label: "🎁 20% OFF Today", color: "#7C3AED" },
+                  { label: "⭐ Top Rated", color: "#0EA5E9" },
+                  { label: "✅ Verified Pros", color: "#059669" },
+                ].map((chip, i) => (
+                  <View key={i} style={[styles.promoChip, { backgroundColor: `${chip.color}14`, borderColor: `${chip.color}35` }]}>
+                    <Text style={[styles.promoChipText, { color: chip.color }]}>{chip.label}</Text>
+                  </View>
+                ))}
+              </ScrollView>
+
+              {/* Services Grid */}
+              <View style={styles.serviceSection}>
+                <View style={styles.sectionHeaderRow}>
+                  <Text style={[styles.sectionHeading, { color: theme.colors.text }]}>Explore all services</Text>
+                  <Sparkles size={15} color={theme.colors.primary} />
+                </View>
+                {isCategoriesLoading ? (
+                  <AppLoader message="Loading..." />
+                ) : (
+                  <>
+                    <View style={styles.catGridUC}>
+                      {categories.slice(0, showAllCats ? categories.length : 6).map((cat: any) => (
+                        <Pressable
+                          key={cat.id}
+                          style={({ pressed }) => [
+                            styles.catCardUC,
+                            { backgroundColor: theme.colors.card, width: CAT_CARD_W },
+                            pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] },
+                          ]}
+                          onPress={() => navigation.navigate("RaiseTicket", { categoryId: cat.id, categoryName: cat.name })}
+                        >
+                          <View style={[styles.catImageWrap, { backgroundColor: theme.colors.background }]}>
+                            <Image
+                              source={{ uri: getCatImage(cat.name) }}
+                              style={styles.catImage}
+                              resizeMode="cover"
+                            />
+                          </View>
+                          <Text style={[styles.catNameUC, { color: theme.colors.text }]} numberOfLines={2}>
+                            {cat.name}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                    {categories.length > 6 && (
+                      <Pressable
+                        onPress={() => setShowAllCats(p => !p)}
+                        style={({ pressed }) => [
+                          styles.showMoreBtn,
+                          {
+                            backgroundColor: theme.colors.card,
+                            borderColor: `${theme.colors.primary}30`,
+                            opacity: pressed ? 0.8 : 1,
+                          },
+                        ]}
+                      >
+                        <Text style={[styles.showMoreText, { color: theme.colors.primary }]}>
+                          {showAllCats ? "Show Less" : "View all services"}
+                        </Text>
+                        <Text style={{ color: theme.colors.primary, fontSize: 11, marginTop: 1 }}>
+                          {showAllCats ? "▲" : "▼"}
                         </Text>
                       </Pressable>
-                    ))}
-                  </View>
-                  {categories.length > 6 && (
-                    <Pressable
-                      onPress={() => setShowAllCats(p => !p)}
-                      style={({ pressed }) => [
-                        styles.showMoreBtn,
-                        {
-                          backgroundColor: theme.colors.card,
-                          borderColor: `${theme.colors.primary}30`,
-                          opacity: pressed ? 0.8 : 1,
-                        },
-                      ]}
-                    >
-                      <Text style={[styles.showMoreText, { color: theme.colors.primary }]}>
-                        {showAllCats ? "Show Less" : "View all services"}
-                      </Text>
-                      <Text style={{ color: theme.colors.primary, fontSize: 11, marginTop: 1 }}>
-                        {showAllCats ? "▲" : "▼"}
-                      </Text>
+                    )}
+                  </>
+                )}
+              </View>
+
+              {/* Recent Booking Strip */}
+              {tickets.length > 0 && (
+                <View style={styles.recentSection}>
+                  <View style={styles.sectionHeaderRow}>
+                    <Text style={[styles.sectionHeading, { color: theme.colors.text }]}>Recent Booking</Text>
+                    <Pressable onPress={() => setActiveTab("TICKETS")}>
+                      <Text style={[styles.seeAllText, { color: theme.colors.primary }]}>See All</Text>
                     </Pressable>
-                  )}
-                </>
+                  </View>
+                  <AppCard
+                    onPress={() => navigation.navigate("CustomerJobDetails", { jobId: tickets[0].id })}
+                    style={styles.recentCard}
+                  >
+                    <View style={styles.cardHeader}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                        <ClipboardList size={15} color={theme.colors.textMuted} />
+                        <Text style={[styles.ticketId, { color: theme.colors.textMuted, fontSize: 12 }]}>{tickets[0].ticketNumber}</Text>
+                      </View>
+                      <AppBadge label={getStatusLabel(tickets[0].status)} variant={getStatusVariant(tickets[0].status)} />
+                    </View>
+                    <Text style={[styles.cardTitle, { color: theme.colors.text, fontSize: 15 }]}>
+                      {tickets[0].subCategory?.name || tickets[0].subCategory?.category?.name || "—"}
+                    </Text>
+
+                    {/* Assigning expert notice */}
+                    {["NEW_TICKET", "ASSIGNED"].includes(tickets[0].status) && (
+                      <View style={[styles.assigningBanner, { backgroundColor: `${theme.colors.primary}0e`, borderColor: `${theme.colors.primary}25` }]}>
+                        <UserCheck size={14} color={theme.colors.primary} />
+                        <Text style={[styles.assigningText, { color: theme.colors.primary }]}>
+                          {tickets[0].status === "ASSIGNED"
+                            ? "Expert assigned — confirming your appointment"
+                            : "Finding the best expert for you…"}
+                        </Text>
+                      </View>
+                    )}
+
+                    <View style={[styles.timeInfo, { marginTop: 8 }]}>
+                      <Calendar size={13} color={theme.colors.textMuted} style={{ marginRight: 5 }} />
+                      <Text style={{ fontSize: 12, color: theme.colors.textMuted }}>{formatDate(tickets[0].createdAt)}</Text>
+                    </View>
+                  </AppCard>
+                </View>
               )}
             </View>
+          )}
 
-            {/* Recent Booking Strip */}
-            {tickets.length > 0 && (
-              <View style={styles.recentSection}>
-                <View style={styles.sectionHeaderRow}>
-                  <Text style={[styles.sectionHeading, { color: theme.colors.text }]}>Recent Booking</Text>
-                  <Pressable onPress={() => setActiveTab("TICKETS")}>
-                    <Text style={[styles.seeAllText, { color: theme.colors.primary }]}>See All</Text>
-                  </Pressable>
-                </View>
-                <AppCard
-                  onPress={() => navigation.navigate("CustomerJobDetails", { jobId: tickets[0].id })}
-                  style={styles.recentCard}
-                >
-                  <View style={styles.cardHeader}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                      <ClipboardList size={15} color={theme.colors.textMuted} />
-                      <Text style={[styles.ticketId, { color: theme.colors.textMuted, fontSize: 12 }]}>{tickets[0].ticketNumber}</Text>
-                    </View>
-                    <AppBadge label={getStatusLabel(tickets[0].status)} variant={getStatusVariant(tickets[0].status)} />
-                  </View>
-                  <Text style={[styles.cardTitle, { color: theme.colors.text, fontSize: 15 }]}>
-                    {tickets[0].subCategory?.name || tickets[0].subCategory?.category?.name || "—"}
-                  </Text>
+          {activeTab === "TICKETS" && (
+            <View style={{ paddingTop: 16 }}>
 
-                  {/* Assigning expert notice */}
-                  {["NEW_TICKET", "ASSIGNED"].includes(tickets[0].status) && (
-                    <View style={[styles.assigningBanner, { backgroundColor: `${theme.colors.primary}0e`, borderColor: `${theme.colors.primary}25` }]}>
-                      <UserCheck size={14} color={theme.colors.primary} />
-                      <Text style={[styles.assigningText, { color: theme.colors.primary }]}>
-                        {tickets[0].status === "ASSIGNED"
-                          ? "Expert assigned — confirming your appointment"
-                          : "Finding the best expert for you…"}
-                      </Text>
-                    </View>
-                  )}
-
-                  <View style={[styles.timeInfo, { marginTop: 8 }]}>
-                    <Calendar size={13} color={theme.colors.textMuted} style={{ marginRight: 5 }} />
-                    <Text style={{ fontSize: 12, color: theme.colors.textMuted }}>{formatDate(tickets[0].createdAt)}</Text>
-                  </View>
-                </AppCard>
+              <View style={[styles.tabHeader, { paddingHorizontal: theme.spacing.md }]}>
+                <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>
+                  Recent Service History
+                </Text>
               </View>
-            )}
-          </View>
-        )}
 
-        {activeTab === "TICKETS" && (
-          <View style={{ paddingTop: 16 }}>
-
-            <View style={[styles.tabHeader, { paddingHorizontal: theme.spacing.md }]}>
-              <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>
-                Recent Service History
-              </Text>
-            </View>
-
-            {isTicketsLoading ? (
-              <AppLoader message="Retrieving requests..." />
-            ) : tickets.length === 0 ? (
-              <AppEmptyState
-                title="No Active Requests"
-                description="You haven't logged any service tickets yet. Tap a category above to request appliance support."
-              />
-            ) : (
-              tickets.map((item) => (
-                <AppCard
-                  key={item.id}
-                  onPress={() =>
-                    navigation.navigate("CustomerJobDetails", {
-                      jobId: item.id,
-                    })
-                  }
-                  style={[styles.ticketCard, { marginHorizontal: theme.spacing.md }]}
-                >
-                  <View style={styles.cardHeader}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                      <ClipboardList size={16} color={theme.colors.textMuted} />
-                      <Text
-                        style={[
-                          styles.ticketId,
-                          { color: theme.colors.textMuted },
-                        ]}
-                      >
-                        {item.ticketNumber}
-                      </Text>
-                    </View>
-                    <AppBadge
-                      label={getStatusLabel(item.status)}
-                      variant={getStatusVariant(item.status)}
-                    />
-                  </View>
-
-                  <Text
-                    style={[styles.cardTitle, { color: theme.colors.text, fontSize: 16, marginTop: 4 }]}
+              {isTicketsLoading ? (
+                <AppLoader message="Retrieving requests..." />
+              ) : tickets.length === 0 ? (
+                <AppEmptyState
+                  title="No Active Requests"
+                  description="You haven't logged any service tickets yet. Tap a category above to request appliance support."
+                />
+              ) : (
+                tickets.map((item) => (
+                  <AppCard
+                    key={item.id}
+                    onPress={() =>
+                      navigation.navigate("CustomerJobDetails", {
+                        jobId: item.id,
+                      })
+                    }
+                    style={[styles.ticketCard, { marginHorizontal: theme.spacing.md }]}
                   >
-                    {item.subCategory?.name || "—"}
-                  </Text>
-                  <Text
-                    style={{
-                      color: theme.colors.textMuted,
-                      fontSize: 14,
-                      marginBottom: 16,
-                      lineHeight: 20,
-                    }}
-                    numberOfLines={2}
-                  >
-                    {item.description}
-                  </Text>
-
-                  <View
-                    style={[
-                      styles.divider,
-                      { backgroundColor: theme.colors.borderLight },
-                    ]}
-                  />
-
-                  <View style={styles.cardFooter}>
-                    <View style={styles.timeInfo}>
-                      <Calendar
-                        size={14}
-                        color={theme.colors.textMuted}
-                        style={{ marginRight: 6 }}
+                    <View style={styles.cardHeader}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                        <ClipboardList size={16} color={theme.colors.textMuted} />
+                        <Text
+                          style={[
+                            styles.ticketId,
+                            { color: theme.colors.textMuted },
+                          ]}
+                        >
+                          {item.ticketNumber}
+                        </Text>
+                      </View>
+                      <AppBadge
+                        label={getStatusLabel(item.status)}
+                        variant={getStatusVariant(item.status)}
                       />
-                      <Text
-                        style={{
-                          fontSize: 13,
-                          color: theme.colors.textMuted,
-                          fontWeight: "500",
-                        }}
-                      >
-                        {formatDate(item.createdAt)}
-                      </Text>
                     </View>
-                    <View
-                      style={[
-                        styles.actionLink,
-                        { backgroundColor: `${theme.colors.primary}15` },
-                      ]}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 13,
-                          color: theme.colors.primary,
-                          fontWeight: "700",
-                          marginRight: 4,
-                        }}
-                      >
-                        Details
-                      </Text>
-                      <ChevronRight size={16} color={theme.colors.primary} />
-                    </View>
-                  </View>
-                </AppCard>
-              ))
-            )}
-          </View>
-        )}
 
-        {activeTab === "INVOICES" && (
-          <View style={{ paddingTop: 16 }}>
-            {isInvoicesLoading ? (
-              <AppLoader message="Retrieving invoices..." />
-            ) : invoices.length === 0 ? (
-              <AppEmptyState
-                title="No Invoices Found"
-                description="Completed services requiring payment will generate dynamic invoices listed here."
-              />
-            ) : (
-              invoices.map((inv) => (
-                <AppCard
-                  key={inv.id}
-                  style={[styles.ticketCard, { marginHorizontal: theme.spacing.md }]}
-                  onPress={() =>
-                    navigation.navigate("InvoiceDetails", { invoiceId: inv.id })
-                  }
-                >
-                  <View style={styles.cardHeader}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                      <FileText size={16} color={theme.colors.textMuted} />
-                      <Text
-                        style={[
-                          styles.ticketId,
-                          { color: theme.colors.textMuted },
-                        ]}
-                      >
-                        {inv.invoiceNumber}
-                      </Text>
-                    </View>
-                    <AppBadge
-                      label={inv.payment?.status || "UNPAID"}
-                      variant="success"
-                    />
-                  </View>
-                  <Text
-                    style={[styles.invoiceTitle, { color: theme.colors.text }]}
-                  >
-                    Ticket Ref:{" "}
-                    <Text style={{ fontWeight: "700" }}>
-                      {inv.ticket?.ticketNumber || "—"}
+                    <Text
+                      style={[styles.cardTitle, { color: theme.colors.text, fontSize: 16, marginTop: 4 }]}
+                    >
+                      {item.subCategory?.name || "—"}
                     </Text>
-                  </Text>
-                  <View style={styles.invoiceBreakdown}>
-                    <View style={styles.breakdownRow}>
-                      <Text
-                        style={{ color: theme.colors.textMuted, fontSize: 13 }}
-                      >
-                        Base Amount:
-                      </Text>
-                      <Text style={{ color: theme.colors.text, fontSize: 13 }}>
-                        ₹{inv.subtotal}
-                      </Text>
-                    </View>
-                    <View style={styles.breakdownRow}>
-                      <Text
-                        style={{ color: theme.colors.textMuted, fontSize: 13 }}
-                      >
-                        {inv.gstPercent > 0
-                          ? `GST (${inv.gstPercent}%):`
-                          : "GST:"}
-                      </Text>
-                      <Text style={{ color: theme.colors.text, fontSize: 13 }}>
-                        ₹{inv.gstAmount}
-                      </Text>
-                    </View>
+                    <Text
+                      style={{
+                        color: theme.colors.textMuted,
+                        fontSize: 14,
+                        marginBottom: 16,
+                        lineHeight: 20,
+                      }}
+                      numberOfLines={2}
+                    >
+                      {item.description}
+                    </Text>
+
                     <View
                       style={[
                         styles.divider,
                         { backgroundColor: theme.colors.borderLight },
                       ]}
                     />
-                    <View style={styles.breakdownRow}>
-                      <Text
-                        style={{
-                          color: theme.colors.text,
-                          fontSize: 14,
-                          fontWeight: "700",
-                        }}
-                      >
-                        Total:
-                      </Text>
-                      <Text
-                        style={{
-                          color: theme.colors.primary,
-                          fontSize: 14,
-                          fontWeight: "700",
-                        }}
-                      >
-                        ₹{inv.total}
-                      </Text>
-                    </View>
-                  </View>
-                </AppCard>
-              ))
-            )}
-          </View>
-        )}
 
-        {activeTab === "PAYMENTS" && (
-          <View style={{ paddingTop: 16 }}>
-            {isPaymentsLoading ? (
-              <AppLoader message="Retrieving transactions..." />
-            ) : payments.length === 0 ? (
-              <AppEmptyState
-                title="No transaction records found"
-                description="Your service payment records will be documented here once transaction processes."
-              />
-            ) : (
-              payments.map((item) => (
-                <AppCard
-                  key={item.id}
-                  style={styles.ticketCard}
-                  onPress={() => {
-                    if (item.invoice?.invoiceNumber) {
-                      const matchingInvoice = invoices.find(
-                        (inv) =>
-                          inv.invoiceNumber === item.invoice?.invoiceNumber,
-                      );
-                      navigation.navigate("InvoiceDetails", {
-                        invoiceId: matchingInvoice?.id || item.id,
-                      });
-                    }
-                  }}
-                >
-                  <View style={styles.cardHeader}>
-                    <View
-                      style={{ flexDirection: "row", alignItems: "center", flex: 1 }}
-                    >
-                      <Text
-                        style={[
-                          styles.label,
-                          { color: theme.colors.textMuted },
-                        ]}
-                      >
-                        Payment ID
-                      </Text>
-                      <Text
-                        style={[styles.valueId, { color: theme.colors.text }]}
-                      >
-                        {item.id.substring(0, 8).toUpperCase()}
-                      </Text>
-                    </View>
-                    <AppBadge
-                      label={item.status}
-                      variant={getPaymentStatusVariant(item.status)}
-                    />
-                  </View>
-
-                  <View style={styles.detailRow}>
-                    <Text
-                      style={[styles.label, { color: theme.colors.textMuted }]}
-                    >
-                      Invoice No.
-                    </Text>
-                    <Text style={[styles.value, { color: theme.colors.text }]}>
-                      {item.invoice?.invoiceNumber || "—"}
-                    </Text>
-                  </View>
-
-                  <View style={styles.detailRow}>
-                    <Text
-                      style={[styles.label, { color: theme.colors.textMuted }]}
-                    >
-                      Amount
-                    </Text>
-                    <Text
-                      style={[
-                        styles.valueAmount,
-                        { color: theme.colors.primary },
-                      ]}
-                    >
-                      ₹{item.amount}
-                    </Text>
-                  </View>
-
-                  <View
-                    style={[
-                      styles.divider,
-                      { backgroundColor: theme.colors.borderLight },
-                    ]}
-                  />
-
-                  <View style={styles.cardFooter}>
-                    <View style={styles.timeInfo}>
-                      <Calendar
-                        size={14}
-                        color={theme.colors.textMuted}
-                        style={{ marginRight: 6 }}
-                      />
-                      <Text
-                        style={{
-                          fontSize: 13,
-                          color: theme.colors.text,
-                          fontWeight: "600",
-                        }}
-                      >
-                        {formatDate(item.createdAt)}
-                      </Text>
-                    </View>
-                    {item.invoice?.invoiceNumber ? (
+                    <View style={styles.cardFooter}>
+                      <View style={styles.timeInfo}>
+                        <Calendar
+                          size={14}
+                          color={theme.colors.textMuted}
+                          style={{ marginRight: 6 }}
+                        />
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            color: theme.colors.textMuted,
+                            fontWeight: "500",
+                          }}
+                        >
+                          {formatDate(item.createdAt)}
+                        </Text>
+                      </View>
                       <View
                         style={[
                           styles.actionLink,
@@ -997,263 +783,487 @@ export const CustomerHomeScreen = () => {
                             marginRight: 4,
                           }}
                         >
-                          Invoice
+                          Details
                         </Text>
                         <ChevronRight size={16} color={theme.colors.primary} />
                       </View>
-                    ) : null}
-                  </View>
-                </AppCard>
-              ))
-            )}
-          </View>
-        )}
+                    </View>
+                  </AppCard>
+                ))
+              )}
+            </View>
+          )}
 
-        {activeTab === "PROFILE" && (
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            style={{ flex: 1, paddingTop: 16 }}
-          >
-            <AppCard style={styles.formCard}>
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: 16,
-                }}
-              >
+          {activeTab === "INVOICES" && (
+            <View style={{ paddingTop: 16 }}>
+              {isInvoicesLoading ? (
+                <AppLoader message="Retrieving invoices..." />
+              ) : invoices.length === 0 ? (
+                <AppEmptyState
+                  title="No Invoices Found"
+                  description="Completed services requiring payment will generate dynamic invoices listed here."
+                />
+              ) : (
+                invoices.map((inv) => (
+                  <AppCard
+                    key={inv.id}
+                    style={[styles.ticketCard, { marginHorizontal: theme.spacing.md }]}
+                    onPress={() =>
+                      navigation.navigate("InvoiceDetails", { invoiceId: inv.id })
+                    }
+                  >
+                    <View style={styles.cardHeader}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                        <FileText size={16} color={theme.colors.textMuted} />
+                        <Text
+                          style={[
+                            styles.ticketId,
+                            { color: theme.colors.textMuted },
+                          ]}
+                        >
+                          {inv.invoiceNumber}
+                        </Text>
+                      </View>
+                      <AppBadge
+                        label={inv.payment?.status || "UNPAID"}
+                        variant="success"
+                      />
+                    </View>
+                    <Text
+                      style={[styles.invoiceTitle, { color: theme.colors.text }]}
+                    >
+                      Ticket Ref:{" "}
+                      <Text style={{ fontWeight: "700" }}>
+                        {inv.ticket?.ticketNumber || "—"}
+                      </Text>
+                    </Text>
+                    <View style={styles.invoiceBreakdown}>
+                      <View style={styles.breakdownRow}>
+                        <Text
+                          style={{ color: theme.colors.textMuted, fontSize: 13 }}
+                        >
+                          Base Amount:
+                        </Text>
+                        <Text style={{ color: theme.colors.text, fontSize: 13 }}>
+                          ₹{inv.subtotal}
+                        </Text>
+                      </View>
+                      <View style={styles.breakdownRow}>
+                        <Text
+                          style={{ color: theme.colors.textMuted, fontSize: 13 }}
+                        >
+                          {inv.gstPercent > 0
+                            ? `GST (${inv.gstPercent}%):`
+                            : "GST:"}
+                        </Text>
+                        <Text style={{ color: theme.colors.text, fontSize: 13 }}>
+                          ₹{inv.gstAmount}
+                        </Text>
+                      </View>
+                      <View
+                        style={[
+                          styles.divider,
+                          { backgroundColor: theme.colors.borderLight },
+                        ]}
+                      />
+                      <View style={styles.breakdownRow}>
+                        <Text
+                          style={{
+                            color: theme.colors.text,
+                            fontSize: 14,
+                            fontWeight: "700",
+                          }}
+                        >
+                          Total:
+                        </Text>
+                        <Text
+                          style={{
+                            color: theme.colors.primary,
+                            fontSize: 14,
+                            fontWeight: "700",
+                          }}
+                        >
+                          ₹{inv.total}
+                        </Text>
+                      </View>
+                    </View>
+                  </AppCard>
+                ))
+              )}
+            </View>
+          )}
+
+          {activeTab === "PAYMENTS" && (
+            <View style={{ paddingTop: 16 }}>
+              {isPaymentsLoading ? (
+                <AppLoader message="Retrieving transactions..." />
+              ) : payments.length === 0 ? (
+                <AppEmptyState
+                  title="No transaction records found"
+                  description="Your service payment records will be documented here once transaction processes."
+                />
+              ) : (
+                payments.map((item) => (
+                  <AppCard
+                    key={item.id}
+                    style={styles.ticketCard}
+                    onPress={() => {
+                      if (item.invoice?.invoiceNumber) {
+                        const matchingInvoice = invoices.find(
+                          (inv) =>
+                            inv.invoiceNumber === item.invoice?.invoiceNumber,
+                        );
+                        navigation.navigate("InvoiceDetails", {
+                          invoiceId: matchingInvoice?.id || item.id,
+                        });
+                      }
+                    }}
+                  >
+                    <View style={styles.cardHeader}>
+                      <View
+                        style={{ flexDirection: "row", alignItems: "center", flex: 1 }}
+                      >
+                        <Text
+                          style={[
+                            styles.label,
+                            { color: theme.colors.textMuted },
+                          ]}
+                        >
+                          Payment ID
+                        </Text>
+                        <Text
+                          style={[styles.valueId, { color: theme.colors.text }]}
+                        >
+                          {item.id.substring(0, 8).toUpperCase()}
+                        </Text>
+                      </View>
+                      <AppBadge
+                        label={item.status}
+                        variant={getPaymentStatusVariant(item.status)}
+                      />
+                    </View>
+
+                    <View style={styles.detailRow}>
+                      <Text
+                        style={[styles.label, { color: theme.colors.textMuted }]}
+                      >
+                        Invoice No.
+                      </Text>
+                      <Text style={[styles.value, { color: theme.colors.text }]}>
+                        {item.invoice?.invoiceNumber || "—"}
+                      </Text>
+                    </View>
+
+                    <View style={styles.detailRow}>
+                      <Text
+                        style={[styles.label, { color: theme.colors.textMuted }]}
+                      >
+                        Amount
+                      </Text>
+                      <Text
+                        style={[
+                          styles.valueAmount,
+                          { color: theme.colors.primary },
+                        ]}
+                      >
+                        ₹{item.amount}
+                      </Text>
+                    </View>
+
+                    <View
+                      style={[
+                        styles.divider,
+                        { backgroundColor: theme.colors.borderLight },
+                      ]}
+                    />
+
+                    <View style={styles.cardFooter}>
+                      <View style={styles.timeInfo}>
+                        <Calendar
+                          size={14}
+                          color={theme.colors.textMuted}
+                          style={{ marginRight: 6 }}
+                        />
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            color: theme.colors.text,
+                            fontWeight: "600",
+                          }}
+                        >
+                          {formatDate(item.createdAt)}
+                        </Text>
+                      </View>
+                      {item.invoice?.invoiceNumber ? (
+                        <View
+                          style={[
+                            styles.actionLink,
+                            { backgroundColor: `${theme.colors.primary}15` },
+                          ]}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 13,
+                              color: theme.colors.primary,
+                              fontWeight: "700",
+                              marginRight: 4,
+                            }}
+                          >
+                            Invoice
+                          </Text>
+                          <ChevronRight size={16} color={theme.colors.primary} />
+                        </View>
+                      ) : null}
+                    </View>
+                  </AppCard>
+                ))
+              )}
+            </View>
+          )}
+
+          {activeTab === "PROFILE" && (
+            <View style={{ flex: 1, paddingTop: 16 }}>
+              <AppCard style={styles.formCard}>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 16,
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.drawerSectionTitle,
+                      { color: theme.colors.textMuted, marginVertical: 0 },
+                    ]}
+                  >
+                    Profile Details
+                  </Text>
+                  <Pressable
+                    onPress={() => setIsEditingProfile(!isEditingProfile)}
+                    style={({ pressed }) => [
+                      styles.editToggleBtn,
+                      {
+                        backgroundColor: isEditingProfile
+                          ? `${theme.colors.danger}15`
+                          : `${theme.colors.primary}15`,
+                      },
+                      pressed && { opacity: 0.7 },
+                    ]}
+                  >
+                    <Edit2
+                      size={14}
+                      color={
+                        isEditingProfile
+                          ? theme.colors.danger
+                          : theme.colors.primary
+                      }
+                      style={{ marginRight: 4 }}
+                    />
+                    <Text
+                      style={[
+                        styles.editToggleText,
+                        {
+                          color: isEditingProfile
+                            ? theme.colors.danger
+                            : theme.colors.primary,
+                        },
+                      ]}
+                    >
+                      {isEditingProfile ? "Cancel" : "Edit"}
+                    </Text>
+                  </Pressable>
+                </View>
+
+                <View style={{ alignItems: "center", marginBottom: 24 }}>
+                  <View style={[styles.avatarCircleLg, { backgroundColor: `${theme.colors.primary}15` }]}>
+                    {(profile?.profileImageUrl || user?.avatar) ? (
+                      <Image
+                        source={{ uri: profile?.profileImageUrl || user?.avatar }}
+                        style={styles.avatarImageLg}
+                      />
+                    ) : (
+                      <User color={theme.colors.primary} size={40} />
+                    )}
+                  </View>
+                  {isEditingProfile && (
+                    <TouchableOpacity
+                      style={[styles.editPhotoBtn, { backgroundColor: theme.colors.primary }]}
+                      onPress={handlePickPhoto}
+                      disabled={uploadPhotoMutation.isPending}
+                    >
+                      <Edit2 size={12} color="#fff" />
+                      <Text style={{ color: "#fff", fontSize: 12, marginLeft: 4, fontWeight: "600" }}>
+                        {uploadPhotoMutation.isPending ? "Uploading..." : "Change Photo"}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                <AppInput
+                  label="Name"
+                  value={name}
+                  onChangeText={setName}
+                  placeholder="Enter your name"
+                  editable={isEditingProfile}
+                  leftIcon={<User size={16} color={theme.colors.textMuted} />}
+                  style={!isEditingProfile && { opacity: 0.7 }}
+                />
+
+                <AppInput
+                  label="Email Address"
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="Enter email address"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  editable={isEditingProfile}
+                  leftIcon={<Mail size={16} color={theme.colors.textMuted} />}
+                  style={!isEditingProfile && { opacity: 0.7 }}
+                />
+
+                <AppInput
+                  label="Primary Phone"
+                  value={phone}
+                  onChangeText={setPhone}
+                  placeholder="Enter mobile phone number"
+                  keyboardType="phone-pad"
+                  editable={false}
+                  leftIcon={
+                    <Smartphone size={16} color={theme.colors.textMuted} />
+                  }
+                  style={{ opacity: 0.6 }}
+                />
+
+                <AppInput
+                  label="Alternate Phone"
+                  value={alternatePhone}
+                  onChangeText={setAlternatePhone}
+                  placeholder="Enter alternate phone number"
+                  keyboardType="phone-pad"
+                  editable={isEditingProfile}
+                  leftIcon={<Phone size={16} color={theme.colors.textMuted} />}
+                  style={!isEditingProfile && { opacity: 0.7 }}
+                />
+
+                <View
+                  style={[
+                    styles.divider,
+                    {
+                      backgroundColor: theme.colors.borderLight,
+                      marginVertical: 16,
+                    },
+                  ]}
+                />
+
                 <Text
                   style={[
                     styles.drawerSectionTitle,
-                    { color: theme.colors.textMuted, marginVertical: 0 },
+                    { color: theme.colors.textMuted, marginBottom: 16 },
                   ]}
                 >
-                  Profile Details
+                  Address Details
                 </Text>
+
+                <AppInput
+                  label="Address"
+                  value={address}
+                  onChangeText={setAddress}
+                  placeholder="Enter street address"
+                  editable={isEditingProfile}
+                  leftIcon={<MapPin size={16} color={theme.colors.textMuted} />}
+                  style={!isEditingProfile && { opacity: 0.7 }}
+                />
+
+                <AppInput
+                  label="City"
+                  value={city}
+                  onChangeText={setCity}
+                  placeholder="Enter city"
+                  editable={isEditingProfile}
+                  leftIcon={<Building size={16} color={theme.colors.textMuted} />}
+                  style={!isEditingProfile && { opacity: 0.7 }}
+                />
+
+                <AppInput
+                  label="Pincode"
+                  value={pincode}
+                  onChangeText={setPincode}
+                  placeholder="Enter pincode"
+                  keyboardType="numeric"
+                  editable={isEditingProfile}
+                  leftIcon={<Hash size={16} color={theme.colors.textMuted} />}
+                  style={!isEditingProfile && { opacity: 0.7 }}
+                />
+
+                {isEditingProfile && (
+                  <AppButton
+                    title="Save Changes"
+                    onPress={handleSaveProfile}
+                    loading={updateProfileMutation.isPending}
+                    style={{ marginTop: 24 }}
+                  />
+                )}
+
                 <Pressable
-                  onPress={() => setIsEditingProfile(!isEditingProfile)}
+                  onPress={() => setLogoutPopupVisible(true)}
                   style={({ pressed }) => [
-                    styles.editToggleBtn,
-                    {
-                      backgroundColor: isEditingProfile
-                        ? `${theme.colors.danger}15`
-                        : `${theme.colors.primary}15`,
-                    },
-                    pressed && { opacity: 0.7 },
+                    styles.profileLogoutBtn,
+                    { backgroundColor: `${theme.colors.danger}15`, marginTop: 32 },
+                    pressed && { opacity: 0.7, transform: [{ scale: 0.98 }] },
                   ]}
                 >
-                  <Edit2
-                    size={14}
-                    color={
-                      isEditingProfile
-                        ? theme.colors.danger
-                        : theme.colors.primary
-                    }
-                    style={{ marginRight: 4 }}
-                  />
+                  <LogOut size={20} color={theme.colors.danger} />
                   <Text
                     style={[
-                      styles.editToggleText,
-                      {
-                        color: isEditingProfile
-                          ? theme.colors.danger
-                          : theme.colors.primary,
-                      },
+                      styles.profileLogoutText,
+                      { color: theme.colors.danger },
                     ]}
                   >
-                    {isEditingProfile ? "Cancel" : "Edit"}
+                    Logout
                   </Text>
                 </Pressable>
-              </View>
+              </AppCard>
+            </View>
+          )}
+        </ScrollView>
 
-              <View style={{ alignItems: "center", marginBottom: 24 }}>
-                <View style={[styles.avatarCircleLg, { backgroundColor: `${theme.colors.primary}15` }]}>
-                  {(profile?.profileImageUrl || user?.avatar) ? (
-                    <Image
-                      source={{ uri: profile?.profileImageUrl || user?.avatar }}
-                      style={styles.avatarImageLg}
-                    />
-                  ) : (
-                    <User color={theme.colors.primary} size={40} />
-                  )}
-                </View>
-                {isEditingProfile && (
-                  <TouchableOpacity
-                    style={[styles.editPhotoBtn, { backgroundColor: theme.colors.primary }]}
-                    onPress={handlePickPhoto}
-                    disabled={uploadPhotoMutation.isPending}
-                  >
-                    <Edit2 size={12} color="#fff" />
-                    <Text style={{ color: "#fff", fontSize: 12, marginLeft: 4, fontWeight: "600" }}>
-                      {uploadPhotoMutation.isPending ? "Uploading..." : "Change Photo"}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              <AppInput
-                label="Name"
-                value={name}
-                onChangeText={setName}
-                placeholder="Enter your name"
-                editable={isEditingProfile}
-                leftIcon={<User size={16} color={theme.colors.textMuted} />}
-                style={!isEditingProfile && { opacity: 0.7 }}
-              />
-
-              <AppInput
-                label="Email Address"
-                value={email}
-                onChangeText={setEmail}
-                placeholder="Enter email address"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                editable={isEditingProfile}
-                leftIcon={<Mail size={16} color={theme.colors.textMuted} />}
-                style={!isEditingProfile && { opacity: 0.7 }}
-              />
-
-              <AppInput
-                label="Primary Phone"
-                value={phone}
-                onChangeText={setPhone}
-                placeholder="Enter mobile phone number"
-                keyboardType="phone-pad"
-                editable={false}
-                leftIcon={
-                  <Smartphone size={16} color={theme.colors.textMuted} />
-                }
-                style={{ opacity: 0.6 }}
-              />
-
-              <AppInput
-                label="Alternate Phone"
-                value={alternatePhone}
-                onChangeText={setAlternatePhone}
-                placeholder="Enter alternate phone number"
-                keyboardType="phone-pad"
-                editable={isEditingProfile}
-                leftIcon={<Phone size={16} color={theme.colors.textMuted} />}
-                style={!isEditingProfile && { opacity: 0.7 }}
-              />
-
-              <View
-                style={[
-                  styles.divider,
-                  {
-                    backgroundColor: theme.colors.borderLight,
-                    marginVertical: 16,
-                  },
-                ]}
-              />
-
-              <Text
-                style={[
-                  styles.drawerSectionTitle,
-                  { color: theme.colors.textMuted, marginBottom: 16 },
-                ]}
-              >
-                Address Details
-              </Text>
-
-              <AppInput
-                label="Address"
-                value={address}
-                onChangeText={setAddress}
-                placeholder="Enter street address"
-                editable={isEditingProfile}
-                leftIcon={<MapPin size={16} color={theme.colors.textMuted} />}
-                style={!isEditingProfile && { opacity: 0.7 }}
-              />
-
-              <AppInput
-                label="City"
-                value={city}
-                onChangeText={setCity}
-                placeholder="Enter city"
-                editable={isEditingProfile}
-                leftIcon={<Building size={16} color={theme.colors.textMuted} />}
-                style={!isEditingProfile && { opacity: 0.7 }}
-              />
-
-              <AppInput
-                label="Pincode"
-                value={pincode}
-                onChangeText={setPincode}
-                placeholder="Enter pincode"
-                keyboardType="numeric"
-                editable={isEditingProfile}
-                leftIcon={<Hash size={16} color={theme.colors.textMuted} />}
-                style={!isEditingProfile && { opacity: 0.7 }}
-              />
-
-              {isEditingProfile && (
-                <AppButton
-                  title="Save Changes"
-                  onPress={handleSaveProfile}
-                  loading={updateProfileMutation.isPending}
-                  style={{ marginTop: 24 }}
-                />
-              )}
-
-              <Pressable
-                onPress={() => setLogoutPopupVisible(true)}
-                style={({ pressed }) => [
-                  styles.profileLogoutBtn,
-                  { backgroundColor: `${theme.colors.danger}15`, marginTop: 32 },
-                  pressed && { opacity: 0.7, transform: [{ scale: 0.98 }] },
-                ]}
-              >
-                <LogOut size={20} color={theme.colors.danger} />
-                <Text
-                  style={[
-                    styles.profileLogoutText,
-                    { color: theme.colors.danger },
-                  ]}
-                >
-                  Logout
-                </Text>
-              </Pressable>
-            </AppCard>
-          </KeyboardAvoidingView>
-        )}
-      </ScrollView>
-
-      {/* Sticky Bottom Navigation Bar */}
-      <View style={[styles.bottomNav, { backgroundColor: theme.colors.card, borderTopColor: theme.colors.borderLight }]}>
-        <Pressable style={styles.navItem} onPress={() => setActiveTab("HOME")}>
-          <View style={[styles.navIconWrap, activeTab === "HOME" && { backgroundColor: `${theme.colors.primary}18` }]}>
-            <Home size={22} color={activeTab === "HOME" ? theme.colors.primary : theme.colors.textMuted} />
-          </View>
-          <Text style={[styles.navLabel, { color: activeTab === "HOME" ? theme.colors.primary : theme.colors.textMuted, fontWeight: activeTab === "HOME" ? "700" : "500" }]}>Home</Text>
-        </Pressable>
-        <Pressable style={styles.navItem} onPress={() => setActiveTab("TICKETS")}>
-          <View style={[styles.navIconWrap, activeTab === "TICKETS" && { backgroundColor: `${theme.colors.primary}18` }]}>
-            <ClipboardList size={22} color={activeTab === "TICKETS" ? theme.colors.primary : theme.colors.textMuted} />
-          </View>
-          <Text style={[styles.navLabel, { color: activeTab === "TICKETS" ? theme.colors.primary : theme.colors.textMuted, fontWeight: activeTab === "TICKETS" ? "700" : "500" }]}>Tickets</Text>
-        </Pressable>
-        <Pressable style={styles.navItem} onPress={() => setActiveTab("PAYMENTS")}>
-          <View style={[styles.navIconWrap, activeTab === "PAYMENTS" && { backgroundColor: `${theme.colors.primary}18` }]}>
-            <CreditCard size={22} color={activeTab === "PAYMENTS" ? theme.colors.primary : theme.colors.textMuted} />
-          </View>
-          <Text style={[styles.navLabel, { color: activeTab === "PAYMENTS" ? theme.colors.primary : theme.colors.textMuted, fontWeight: activeTab === "PAYMENTS" ? "700" : "500" }]}>Payments</Text>
-        </Pressable>
-        <Pressable style={styles.navItem} onPress={() => setActiveTab("INVOICES")}>
-          <View style={[styles.navIconWrap, activeTab === "INVOICES" && { backgroundColor: `${theme.colors.primary}18` }]}>
-            <FileText size={22} color={activeTab === "INVOICES" ? theme.colors.primary : theme.colors.textMuted} />
-          </View>
-          <Text style={[styles.navLabel, { color: activeTab === "INVOICES" ? theme.colors.primary : theme.colors.textMuted, fontWeight: activeTab === "INVOICES" ? "700" : "500" }]}>Invoices</Text>
-        </Pressable>
-        <Pressable style={styles.navItem} onPress={() => setActiveTab("PROFILE")}>
-          <View style={[styles.navIconWrap, activeTab === "PROFILE" && { backgroundColor: `${theme.colors.primary}18` }]}>
-            <User size={22} color={activeTab === "PROFILE" ? theme.colors.primary : theme.colors.textMuted} />
-          </View>
-          <Text style={[styles.navLabel, { color: activeTab === "PROFILE" ? theme.colors.primary : theme.colors.textMuted, fontWeight: activeTab === "PROFILE" ? "700" : "500" }]}>Profile</Text>
-        </Pressable>
+        {/* Sticky Bottom Navigation Bar */}
+        <View style={[styles.bottomNav, { backgroundColor: theme.colors.card, borderTopColor: theme.colors.borderLight }]}>
+          <Pressable style={styles.navItem} onPress={() => setActiveTab("HOME")}>
+            <View style={[styles.navIconWrap, activeTab === "HOME" && { backgroundColor: `${theme.colors.primary}18` }]}>
+              <Home size={22} color={activeTab === "HOME" ? theme.colors.primary : theme.colors.textMuted} />
+            </View>
+            <Text style={[styles.navLabel, { color: activeTab === "HOME" ? theme.colors.primary : theme.colors.textMuted, fontWeight: activeTab === "HOME" ? "700" : "500" }]}>Home</Text>
+          </Pressable>
+          <Pressable style={styles.navItem} onPress={() => setActiveTab("TICKETS")}>
+            <View style={[styles.navIconWrap, activeTab === "TICKETS" && { backgroundColor: `${theme.colors.primary}18` }]}>
+              <ClipboardList size={22} color={activeTab === "TICKETS" ? theme.colors.primary : theme.colors.textMuted} />
+            </View>
+            <Text style={[styles.navLabel, { color: activeTab === "TICKETS" ? theme.colors.primary : theme.colors.textMuted, fontWeight: activeTab === "TICKETS" ? "700" : "500" }]}>Tickets</Text>
+          </Pressable>
+          <Pressable style={styles.navItem} onPress={() => setActiveTab("PAYMENTS")}>
+            <View style={[styles.navIconWrap, activeTab === "PAYMENTS" && { backgroundColor: `${theme.colors.primary}18` }]}>
+              <CreditCard size={22} color={activeTab === "PAYMENTS" ? theme.colors.primary : theme.colors.textMuted} />
+            </View>
+            <Text style={[styles.navLabel, { color: activeTab === "PAYMENTS" ? theme.colors.primary : theme.colors.textMuted, fontWeight: activeTab === "PAYMENTS" ? "700" : "500" }]}>Payments</Text>
+          </Pressable>
+          <Pressable style={styles.navItem} onPress={() => setActiveTab("INVOICES")}>
+            <View style={[styles.navIconWrap, activeTab === "INVOICES" && { backgroundColor: `${theme.colors.primary}18` }]}>
+              <FileText size={22} color={activeTab === "INVOICES" ? theme.colors.primary : theme.colors.textMuted} />
+            </View>
+            <Text style={[styles.navLabel, { color: activeTab === "INVOICES" ? theme.colors.primary : theme.colors.textMuted, fontWeight: activeTab === "INVOICES" ? "700" : "500" }]}>Invoices</Text>
+          </Pressable>
+          <Pressable style={styles.navItem} onPress={() => setActiveTab("PROFILE")}>
+            <View style={[styles.navIconWrap, activeTab === "PROFILE" && { backgroundColor: `${theme.colors.primary}18` }]}>
+              <User size={22} color={activeTab === "PROFILE" ? theme.colors.primary : theme.colors.textMuted} />
+            </View>
+            <Text style={[styles.navLabel, { color: activeTab === "PROFILE" ? theme.colors.primary : theme.colors.textMuted, fontWeight: activeTab === "PROFILE" ? "700" : "500" }]}>Profile</Text>
+          </Pressable>
+        </View>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -1263,7 +1273,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingTop: 0,
-    paddingBottom: 40,
+    paddingBottom: 120,
   },
   tabHeader: {
     flexDirection: "row",

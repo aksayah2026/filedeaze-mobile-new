@@ -34,6 +34,9 @@ export const AppInput = React.forwardRef<TextInput, AppInputProps>(
   ) => {
     const theme = useTheme();
     const [isFocused, setIsFocused] = useState(false);
+    const localRef = React.useRef<TextInput>(null);
+
+    React.useImperativeHandle(ref, () => localRef.current!);
 
     const handleFocus = (e: any) => {
       setIsFocused(true);
@@ -68,6 +71,11 @@ export const AppInput = React.forwardRef<TextInput, AppInputProps>(
         )}
 
         <View
+          onTouchStart={() => {
+            if (rest.editable !== false) {
+              localRef.current?.focus();
+            }
+          }}
           style={[
             styles.inputContainer,
             {
@@ -85,10 +93,14 @@ export const AppInput = React.forwardRef<TextInput, AppInputProps>(
             },
           ]}
         >
-          {leftIcon && <View style={styles.leftIconContainer}>{leftIcon}</View>}
+          {leftIcon && (
+            <View pointerEvents="none" style={styles.leftIconContainer}>
+              {leftIcon}
+            </View>
+          )}
 
           <TextInput
-            ref={ref}
+            ref={localRef}
             style={[
               styles.textInput,
               {
