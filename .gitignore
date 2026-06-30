@@ -12,3 +12,9 @@ web-build/
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Android build artifacts and assets generated during build/bundling
+android/app/src/main/assets/index.android.bundle
+android/app/src/main/assets/index.android.bundle.meta
+android/app/src/main/res/drawable-*/node_modules_*
+android/app/src/main/res/raw/keep.xml

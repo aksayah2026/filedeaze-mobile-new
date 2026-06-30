@@ -24,63 +24,106 @@ const getMessaging = () => {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 function NotificationHandler() {
-  const { token } = useAuthStore();
+  const { token, user } = useAuthStore();
   const navigation = useNavigation<any>();
 
   useEffect(() => {
     if (!token) return;
 
-    // Register FCM token with backend after login
-    registerDeviceToken(token);
-
-    const messagingInstance = getMessaging();
-    if (!messagingInstance) return;
-
+    let unsubTokenRefresh: (() => void) | null = null;
     let unsubForeground: (() => void) | undefined;
     let unsubBackground: (() => void) | undefined;
 
+    // Register FCM token with backend after login
+    registerDeviceToken(token).then((unsub) => {
+      unsubTokenRefresh = unsub;
+    });
+
+    const messagingInstance = getMessaging();
+    console.log('[NotificationHandler] Initializing listeners. messagingInstance available =', !!messagingInstance);
+    if (!messagingInstance) return;
+
     try {
-      // Foreground notification
+      // Foreground notification — show alert with "Open" button to navigate
       unsubForeground = messagingInstance().onMessage(async (remoteMessage: any) => {
+        console.log('[NotificationHandler] Foreground notification received:', JSON.stringify(remoteMessage, null, 2));
         const { title, body } = remoteMessage.notification ?? {};
-        Alert.alert(title ?? "FieldEaze", body ?? "");
+        Alert.alert(
+          title ?? "FieldEaze",
+          body ?? "",
+          [
+            { text: "Dismiss", style: "cancel" },
+            {
+              text: "Open",
+              onPress: () => handleNotificationNavigation(remoteMessage, navigation, user?.role),
+            },
+          ],
+        );
       });
 
       // Background notification tap
       unsubBackground = messagingInstance().onNotificationOpenedApp((remoteMessage: any) => {
-        handleNotificationNavigation(remoteMessage, navigation);
+        console.log('[NotificationHandler] Background notification opened app:', JSON.stringify(remoteMessage, null, 2));
+        handleNotificationNavigation(remoteMessage, navigation, user?.role);
       });
 
       // Quit state notification tap
       messagingInstance().getInitialNotification().then((remoteMessage: any) => {
         if (remoteMessage) {
-          handleNotificationNavigation(remoteMessage, navigation);
+          console.log('[NotificationHandler] App opened from quit state via notification:', JSON.stringify(remoteMessage, null, 2));
+          handleNotificationNavigation(remoteMessage, navigation, user?.role);
+        } else {
+          console.log('[NotificationHandler] App opened from quit state (no initial notification)');
         }
       });
     } catch (error) {
-      console.error("Failed to initialize Firebase Messaging listeners:", error);
+      console.error("[NotificationHandler] Failed to initialize Firebase Messaging listeners:", error);
     }
 
     return () => {
-      if (unsubForeground) unsubForeground();
-      if (unsubBackground) unsubBackground();
+      if (unsubTokenRefresh) {
+        console.log('[NotificationHandler] Cleaning up token refresh listener');
+        unsubTokenRefresh();
+      }
+      if (unsubForeground) {
+        console.log('[NotificationHandler] Cleaning up foreground notification listener');
+        unsubForeground();
+      }
+      if (unsubBackground) {
+        console.log('[NotificationHandler] Cleaning up background notification listener');
+        unsubBackground();
+      }
     };
-  }, [token, navigation]);
+  }, [token, navigation, user?.role]);
 
   return null;
 }
 
-function handleNotificationNavigation(remoteMessage: any, navigation: any) {
+function handleNotificationNavigation(remoteMessage: any, navigation: any, userRole?: string) {
   const { ticketId, route } = remoteMessage.data ?? {};
-  // Assuming ticketId usually maps to a Job Detail screen for technicians
+  console.log('[NotificationHandler] handleNotificationNavigation called. data =', JSON.stringify(remoteMessage.data, null, 2), 'userRole =', userRole);
+  
   if (ticketId) {
-    // Modify based on actual navigation structure
-    navigation.navigate("TechnicianPortal", {
-      screen: "JobDetail",
-      params: { id: ticketId },
-    });
+    if (userRole === "TECHNICIAN") {
+      console.log('[NotificationHandler] Navigating to TechnicianPortal -> TechnicianJobDetails with jobId =', ticketId);
+      navigation.navigate("TechnicianPortal", {
+        screen: "TechnicianJobDetails",
+        params: { jobId: ticketId },
+      });
+    } else if (userRole === "CUSTOMER") {
+      console.log('[NotificationHandler] Navigating to CustomerPortal -> CustomerTicketDetails with ticketId =', ticketId);
+      navigation.navigate("CustomerPortal", {
+        screen: "CustomerTicketDetails",
+        params: { ticketId: ticketId },
+      });
+    } else {
+      console.warn('[NotificationHandler] handleNotificationNavigation: ticketId present but user role is neither TECHNICIAN nor CUSTOMER:', userRole);
+    }
   } else if (route) {
+    console.log('[NotificationHandler] Navigating to route =', route);
     navigation.navigate(route);
+  } else {
+    console.warn('[NotificationHandler] handleNotificationNavigation: No ticketId or route found in message data.');
   }
 }
 
