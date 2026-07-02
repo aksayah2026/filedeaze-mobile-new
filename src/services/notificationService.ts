@@ -1,6 +1,43 @@
 import { NativeModules, Platform } from 'react-native';
 import { apiClient } from '../api/client';
 
+export interface AppNotification {
+  id: string;
+  title: string;
+  body: string;
+  read: boolean;
+  createdAt: string;
+  ticketId?: string;
+  data?: Record<string, string>;
+}
+
+export async function getNotifications(): Promise<AppNotification[]> {
+  const response = await apiClient.get('/mobile/notifications');
+  const rawList = response.data?.data ?? response.data ?? [];
+  const list = Array.isArray(rawList) ? rawList : [];
+  return list.map((item: any) => {
+    const isRead = item.read !== undefined ? item.read : (item.isRead !== undefined ? item.isRead : false);
+    const ticketId = item.ticketId ?? item.data?.ticketId ?? undefined;
+    return {
+      id: String(item.id ?? item._id ?? Math.random().toString()),
+      title: item.title ?? "Notification",
+      body: item.body ?? "",
+      read: isRead,
+      createdAt: item.createdAt ?? new Date().toISOString(),
+      ticketId: ticketId ? String(ticketId) : undefined,
+      data: item.data,
+    };
+  });
+}
+
+export async function markNotificationRead(notificationId: string): Promise<void> {
+  await apiClient.patch(`/mobile/notifications/${notificationId}/read`);
+}
+
+export async function markAllNotificationsRead(): Promise<void> {
+  await apiClient.patch('/mobile/notifications/read-all');
+}
+
 const hasFirebase = !!NativeModules.RNFBAppModule;
 const getMessaging = () => {
   if (hasFirebase) {

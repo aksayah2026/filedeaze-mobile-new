@@ -57,7 +57,7 @@ const TAB_FILTERS: { label: string; value: TabFilter }[] = [
 ];
 
 const ACTION_LABEL: Partial<Record<TicketStatus, string>> = {
-  ASSIGNED: "Accept Job",
+  ASSIGNED: "View Details",
   ACCEPTED: "Start Travelling",
   TRAVELLING: "Mark Reached",
   REACHED: "Start Job",
@@ -81,7 +81,7 @@ export const AssignedJobsScreen = () => {
   const route = useRoute<RouteProps>();
 
   const [activeTab, setActiveTab] = useState<TabFilter>(route.params?.initialTab || "ALL");
-  const [selectedDate, setSelectedDate] = useState<string | null>(getTodayStr());
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [lockModalVisible, setLockModalVisible] = useState(false);
   const [lockModalMessage, setLockModalMessage] = useState("");
   const tabListRef = useRef<FlatList>(null);
@@ -89,7 +89,7 @@ export const AssignedJobsScreen = () => {
   const now = new Date();
   const [currentMonth, setCurrentMonth] = useState(now.getMonth() + 1);
   const [currentYear, setCurrentYear] = useState(now.getFullYear());
-  const [calendarVisible, setCalendarVisible] = useState(true);
+  const [calendarVisible, setCalendarVisible] = useState(false);
 
   const getSelectedDateText = () => {
     if (!selectedDate) return "Filter by Date";

@@ -75,6 +75,91 @@ const compressImage = async (uri: string): Promise<string> => {
   }
 };
 
+interface WheelPickerProps {
+  items: string[];
+  selectedValue: string;
+  onValueChange: (value: string) => void;
+  theme: any;
+}
+
+const WheelPicker: React.FC<WheelPickerProps> = ({ items, selectedValue, onValueChange, theme }) => {
+  const ITEM_HEIGHT = 44;
+  const scrollViewRef = React.useRef<ScrollView>(null);
+
+  // Prepend and append empty items for centering
+  const data = React.useMemo(() => ["", ...items, ""], [items]);
+
+  React.useEffect(() => {
+    const index = items.indexOf(selectedValue);
+    if (index !== -1 && scrollViewRef.current) {
+      const timer = setTimeout(() => {
+        scrollViewRef.current?.scrollTo({ y: index * ITEM_HEIGHT, animated: false });
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedValue, items]);
+
+  const handleScroll = (event: any) => {
+    const y = event.nativeEvent.contentOffset.y;
+    const index = Math.round(y / ITEM_HEIGHT);
+    const safeIndex = Math.max(0, Math.min(items.length - 1, index));
+    const val = items[safeIndex];
+    if (val !== selectedValue) {
+      onValueChange(val);
+    }
+  };
+
+  return (
+    <View style={{ height: ITEM_HEIGHT * 3, width: 70, overflow: "hidden" }}>
+      {/* Target indicator lines */}
+      <View
+        style={{
+          position: "absolute",
+          top: ITEM_HEIGHT,
+          left: 0,
+          right: 0,
+          height: ITEM_HEIGHT,
+          borderTopWidth: 1.5,
+          borderBottomWidth: 1.5,
+          borderColor: theme.colors.primary,
+          backgroundColor: `${theme.colors.primary}08`,
+        }}
+        pointerEvents="none"
+      />
+      <ScrollView
+        ref={scrollViewRef}
+        showsVerticalScrollIndicator={false}
+        snapToInterval={ITEM_HEIGHT}
+        decelerationRate="fast"
+        scrollEventThrottle={16}
+        onMomentumScrollEnd={handleScroll}
+        contentContainerStyle={{ paddingVertical: 0 }}
+      >
+        {data.map((item, idx) => (
+          <View
+            key={idx}
+            style={{
+              height: ITEM_HEIGHT,
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            <Text
+              style={{
+                fontSize: item === selectedValue ? 18 : 14,
+                fontWeight: item === selectedValue ? "700" : "500",
+                color: item === selectedValue ? theme.colors.primary : theme.colors.textMuted,
+              }}
+            >
+              {item}
+            </Text>
+          </View>
+        ))}
+      </ScrollView>
+    </View>
+  );
+};
+
 export const RaiseTicketScreen = () => {
   const theme = useTheme();
   const navigation = useNavigation<NavigationProp>();
@@ -1312,75 +1397,28 @@ export const RaiseTicketScreen = () => {
             </View>
 
             <View style={{ padding: 16, paddingBottom: 28 }}>
-              {/* Spinner Column Selectors — HH : MM */}
-              <View style={styles.timeSelectorRow}>
-                {/* Hours Column */}
-                <View style={styles.timeColumn}>
-                  <Pressable
-                    style={[styles.timeArrowBtn, { backgroundColor: `${theme.colors.primary}10`, borderColor: theme.colors.borderLight }]}
-                    onPress={() => setTempHour((prev) => (prev === 12 ? 1 : prev + 1))}
-                  >
-                    <ChevronUp size={22} color={theme.colors.primary} />
-                  </Pressable>
-                  <View style={styles.timeValueBox}>
-                    <Text style={[styles.timeValueText, { color: theme.colors.text }]}>{tempHour.toString().padStart(2, "0")}</Text>
-                    <Text style={[styles.timeLabelText, { color: theme.colors.textMuted }]}>Hour</Text>
-                  </View>
-                  <Pressable
-                    style={[styles.timeArrowBtn, { backgroundColor: `${theme.colors.primary}10`, borderColor: theme.colors.borderLight }]}
-                    onPress={() => setTempHour((prev) => (prev === 1 ? 12 : prev - 1))}
-                  >
-                    <ChevronDown size={22} color={theme.colors.primary} />
-                  </Pressable>
-                </View>
-
-                {/* Separator */}
-                <Text style={{ fontSize: 36, fontWeight: "700", color: theme.colors.textMuted, marginBottom: 20 }}>:</Text>
-
-                {/* Minutes Column */}
-                <View style={styles.timeColumn}>
-                  <Pressable
-                    style={[styles.timeArrowBtn, { backgroundColor: `${theme.colors.primary}10`, borderColor: theme.colors.borderLight }]}
-                    onPress={() => setTempMin((prev) => (prev >= 55 ? 0 : prev + 5))}
-                  >
-                    <ChevronUp size={22} color={theme.colors.primary} />
-                  </Pressable>
-                  <View style={styles.timeValueBox}>
-                    <Text style={[styles.timeValueText, { color: theme.colors.text }]}>{tempMin.toString().padStart(2, "0")}</Text>
-                    <Text style={[styles.timeLabelText, { color: theme.colors.textMuted }]}>Min</Text>
-                  </View>
-                  <Pressable
-                    style={[styles.timeArrowBtn, { backgroundColor: `${theme.colors.primary}10`, borderColor: theme.colors.borderLight }]}
-                    onPress={() => setTempMin((prev) => (prev === 0 ? 55 : prev - 5))}
-                  >
-                    <ChevronDown size={22} color={theme.colors.primary} />
-                  </Pressable>
-                </View>
-
-                {/* AM/PM Column */}
-                <View style={[styles.timeColumn, { justifyContent: "center" }]}>
-                  <Pressable
-                    style={[
-                      styles.ampmBtn,
-                      tempPeriod === "AM" && { backgroundColor: theme.colors.primary },
-                      tempPeriod !== "AM" && { backgroundColor: theme.colors.background, borderColor: theme.colors.borderLight, borderWidth: 1.5 },
-                    ]}
-                    onPress={() => setTempPeriod("AM")}
-                  >
-                    <Text style={[styles.ampmBtnText, { color: tempPeriod === "AM" ? "#ffffff" : theme.colors.textMuted }]}>AM</Text>
-                  </Pressable>
-                  <View style={{ height: 10 }} />
-                  <Pressable
-                    style={[
-                      styles.ampmBtn,
-                      tempPeriod === "PM" && { backgroundColor: theme.colors.primary },
-                      tempPeriod !== "PM" && { backgroundColor: theme.colors.background, borderColor: theme.colors.borderLight, borderWidth: 1.5 },
-                    ]}
-                    onPress={() => setTempPeriod("PM")}
-                  >
-                    <Text style={[styles.ampmBtnText, { color: tempPeriod === "PM" ? "#ffffff" : theme.colors.textMuted }]}>PM</Text>
-                  </Pressable>
-                </View>
+              {/* Scrollable wheel selectors */}
+              <View style={{ flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 15, marginVertical: 20 }}>
+                <WheelPicker
+                  items={["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"]}
+                  selectedValue={tempHour.toString()}
+                  onValueChange={(val) => setTempHour(parseInt(val, 10))}
+                  theme={theme}
+                />
+                <Text style={{ fontSize: 24, fontWeight: "700", color: theme.colors.textMuted }}>:</Text>
+                <WheelPicker
+                  items={["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"]}
+                  selectedValue={tempMin.toString().padStart(2, "0")}
+                  onValueChange={(val) => setTempMin(parseInt(val, 10))}
+                  theme={theme}
+                />
+                <View style={{ width: 10 }} />
+                <WheelPicker
+                  items={["AM", "PM"]}
+                  selectedValue={tempPeriod}
+                  onValueChange={(val: any) => setTempPeriod(val)}
+                  theme={theme}
+                />
               </View>
 
               {/* Formatted Time Preview */}

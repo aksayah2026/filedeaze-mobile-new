@@ -101,6 +101,7 @@ export const OtpVerificationScreen = () => {
         useAuthStore.setState({
           user: userProfile,
           token: loginRes.token,
+          refreshToken: loginRes.refreshToken,
           role: loginRes.user.role as any,
           isAuthenticated: true,
         });

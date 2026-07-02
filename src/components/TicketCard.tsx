@@ -96,7 +96,7 @@ export const TicketCard: React.FC<TicketCardProps> = ({ ticket, onPress, style }
   const ctaText = isLocked
     ? `Locked (Time Expired)`
     : ticket.status === "ASSIGNED" || ticket.status === "NEW"
-    ? "Accept Job"
+    ? "View Details"
     : ticket.status === "ACCEPTED"
     ? "Start Travel"
     : ticket.status === "TRAVELLING"

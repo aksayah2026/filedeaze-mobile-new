@@ -12,6 +12,7 @@ import { InvoiceListScreen } from "../screens/customer/InvoiceListScreen";
 import { InvoiceDetailsScreen } from "../screens/customer/InvoiceDetailsScreen";
 import { FeedbackScreen } from "../screens/customer/FeedbackScreen";
 import { AddressBookScreen } from "../screens/customer/AddressBookScreen";
+import { NotificationListScreen } from "../screens/shared/NotificationListScreen";
 
 import { CustomerHomeScreen } from "../screens/customer/CustomerHomeScreen";
 import { CustomerJobDetailsScreen } from "../screens/customer/CustomerJobDetailsScreen";
@@ -40,6 +41,7 @@ export const CustomerNavigator = () => {
       <Stack.Screen name="Feedback" component={FeedbackScreen} />
       <Stack.Screen name="AddressBook" component={AddressBookScreen} />
 
+      <Stack.Screen name="NotificationList" component={NotificationListScreen} />
       {/* Keep older screens for compatibility */}
       <Stack.Screen name="CustomerHome" component={CustomerHomeScreen} />
       <Stack.Screen name="CustomerJobDetails" component={CustomerJobDetailsScreen} />

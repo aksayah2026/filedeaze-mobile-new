@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   View,
   Text,
@@ -50,6 +51,7 @@ import {
   useCustomerPayments,
   useCategories,
 } from "../../hooks/useCustomer";
+import { useUnreadNotificationCount } from "../../hooks/useNotifications";
 import { CustomerStackParamList } from "../../types/navigation.types";
 import { AppHeader } from "../../components/AppHeader";
 import { AppLoader } from "../../components/AppLoader";
@@ -71,6 +73,13 @@ export const CustomerHomeScreen = () => {
   const theme = useTheme();
   const navigation = useNavigation<NavigationProp>();
   const { user, logout, updateAvatar } = useAuthStore();
+  const insets = useSafeAreaInsets();
+
+  const { width: screenWidth } = Dimensions.get("window");
+  const isSmallScreen = screenWidth < 375;
+  const tabIconSize = isSmallScreen ? 22 : 24;
+  const tabLabelSize = isSmallScreen ? 10 : 11;
+  const BASE_TAB_HEIGHT = 60;
 
   const [activeTab, setActiveTab] = useState<CustomerTab>("HOME");
   const [logoutPopupVisible, setLogoutPopupVisible] = useState(false);
@@ -108,6 +117,7 @@ export const CustomerHomeScreen = () => {
   } = useCustomerProfile();
   const updateProfileMutation = useUpdateCustomerProfile();
   const uploadPhotoMutation = useUploadCustomerProfilePhoto();
+  const unreadNotifCount = useUnreadNotificationCount();
 
   // Form states
   const [name, setName] = useState("");
@@ -437,15 +447,34 @@ export const CustomerHomeScreen = () => {
                     </Text>
                   </View>
                 </View>
-                <View style={[styles.locationBellBtn, { backgroundColor: `${theme.colors.primary}14` }]}>
+                <Pressable
+                  style={[styles.locationBellBtn, { backgroundColor: `${theme.colors.primary}14` }]}
+                  onPress={() => navigation.navigate("NotificationList")}
+                >
                   <Bell size={19} color={theme.colors.primary} />
-                </View>
+                  {unreadNotifCount > 0 && (
+                    <View style={[styles.notifBadge, { backgroundColor: theme.colors.danger }]}>
+                      <Text style={styles.notifBadgeText}>
+                        {unreadNotifCount > 9 ? "9+" : unreadNotifCount}
+                      </Text>
+                    </View>
+                  )}
+                </Pressable>
               </View>
 
               {/* Search Bar + Dropdown */}
               <View style={[styles.homeSearchWrap, { zIndex: 100, elevation: 100 }]}>
                 <View style={{ position: "relative" }}>
-                  <View style={[styles.homeSearchBar, { backgroundColor: theme.colors.background, borderColor: searchQuery ? theme.colors.primary : theme.colors.borderLight }]}>
+                  <View style={[
+                    styles.homeSearchBar,
+                    {
+                      backgroundColor: theme.colors.background,
+                      borderColor: searchQuery ? theme.colors.primary : theme.colors.borderLight,
+                      borderBottomLeftRadius: searchQuery.length > 0 ? 0 : 12,
+                      borderBottomRightRadius: searchQuery.length > 0 ? 0 : 12,
+                      borderBottomWidth: searchQuery.length > 0 ? 0 : 1.5,
+                    }
+                  ]}>
                     <Search size={17} color={searchQuery ? theme.colors.primary : theme.colors.textLight} />
                     <TextInput
                       style={[styles.homeSearchInput, { color: theme.colors.text }]}
@@ -464,7 +493,19 @@ export const CustomerHomeScreen = () => {
                   </View>
                   {/* Search Dropdown */}
                   {searchQuery.length > 0 && (
-                    <View style={[styles.searchDropdown, { backgroundColor: theme.colors.card, borderColor: theme.colors.borderLight }]}>
+                    <View style={[
+                      styles.searchDropdown,
+                      {
+                        backgroundColor: theme.colors.card,
+                        borderColor: theme.colors.primary,
+                        borderTopWidth: 0,
+                        borderTopLeftRadius: 0,
+                        borderTopRightRadius: 0,
+                        borderBottomLeftRadius: 12,
+                        borderBottomRightRadius: 12,
+                        top: "100%",
+                      }
+                    ]}>
                       {(() => {
                         const results = categories.filter((c: any) =>
                           c.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -1230,36 +1271,44 @@ export const CustomerHomeScreen = () => {
         </ScrollView>
 
         {/* Sticky Bottom Navigation Bar */}
-        <View style={[styles.bottomNav, { backgroundColor: theme.colors.card, borderTopColor: theme.colors.borderLight }]}>
+        <View style={[
+          styles.bottomNav,
+          {
+            backgroundColor: theme.colors.card,
+            borderTopColor: theme.colors.borderLight,
+            paddingBottom: Math.max(insets.bottom, 8),
+            height: BASE_TAB_HEIGHT + Math.max(insets.bottom, 8),
+          }
+        ]}>
           <Pressable style={styles.navItem} onPress={() => setActiveTab("HOME")}>
             <View style={[styles.navIconWrap, activeTab === "HOME" && { backgroundColor: `${theme.colors.primary}18` }]}>
-              <Home size={22} color={activeTab === "HOME" ? theme.colors.primary : theme.colors.textMuted} />
+              <Home size={tabIconSize} color={activeTab === "HOME" ? theme.colors.primary : theme.colors.textMuted} />
             </View>
-            <Text style={[styles.navLabel, { color: activeTab === "HOME" ? theme.colors.primary : theme.colors.textMuted, fontWeight: activeTab === "HOME" ? "700" : "500" }]}>Home</Text>
+            <Text style={[styles.navLabel, { fontSize: tabLabelSize, color: activeTab === "HOME" ? theme.colors.primary : theme.colors.textMuted, fontWeight: activeTab === "HOME" ? "700" : "500" }]}>Home</Text>
           </Pressable>
           <Pressable style={styles.navItem} onPress={() => setActiveTab("TICKETS")}>
             <View style={[styles.navIconWrap, activeTab === "TICKETS" && { backgroundColor: `${theme.colors.primary}18` }]}>
-              <ClipboardList size={22} color={activeTab === "TICKETS" ? theme.colors.primary : theme.colors.textMuted} />
+              <ClipboardList size={tabIconSize} color={activeTab === "TICKETS" ? theme.colors.primary : theme.colors.textMuted} />
             </View>
-            <Text style={[styles.navLabel, { color: activeTab === "TICKETS" ? theme.colors.primary : theme.colors.textMuted, fontWeight: activeTab === "TICKETS" ? "700" : "500" }]}>Tickets</Text>
+            <Text style={[styles.navLabel, { fontSize: tabLabelSize, color: activeTab === "TICKETS" ? theme.colors.primary : theme.colors.textMuted, fontWeight: activeTab === "TICKETS" ? "700" : "500" }]}>Tickets</Text>
           </Pressable>
           <Pressable style={styles.navItem} onPress={() => setActiveTab("PAYMENTS")}>
             <View style={[styles.navIconWrap, activeTab === "PAYMENTS" && { backgroundColor: `${theme.colors.primary}18` }]}>
-              <CreditCard size={22} color={activeTab === "PAYMENTS" ? theme.colors.primary : theme.colors.textMuted} />
+              <CreditCard size={tabIconSize} color={activeTab === "PAYMENTS" ? theme.colors.primary : theme.colors.textMuted} />
             </View>
-            <Text style={[styles.navLabel, { color: activeTab === "PAYMENTS" ? theme.colors.primary : theme.colors.textMuted, fontWeight: activeTab === "PAYMENTS" ? "700" : "500" }]}>Payments</Text>
+            <Text style={[styles.navLabel, { fontSize: tabLabelSize, color: activeTab === "PAYMENTS" ? theme.colors.primary : theme.colors.textMuted, fontWeight: activeTab === "PAYMENTS" ? "700" : "500" }]}>Payments</Text>
           </Pressable>
           <Pressable style={styles.navItem} onPress={() => setActiveTab("INVOICES")}>
             <View style={[styles.navIconWrap, activeTab === "INVOICES" && { backgroundColor: `${theme.colors.primary}18` }]}>
-              <FileText size={22} color={activeTab === "INVOICES" ? theme.colors.primary : theme.colors.textMuted} />
+              <FileText size={tabIconSize} color={activeTab === "INVOICES" ? theme.colors.primary : theme.colors.textMuted} />
             </View>
-            <Text style={[styles.navLabel, { color: activeTab === "INVOICES" ? theme.colors.primary : theme.colors.textMuted, fontWeight: activeTab === "INVOICES" ? "700" : "500" }]}>Invoices</Text>
+            <Text style={[styles.navLabel, { fontSize: tabLabelSize, color: activeTab === "INVOICES" ? theme.colors.primary : theme.colors.textMuted, fontWeight: activeTab === "INVOICES" ? "700" : "500" }]}>Invoices</Text>
           </Pressable>
           <Pressable style={styles.navItem} onPress={() => setActiveTab("PROFILE")}>
             <View style={[styles.navIconWrap, activeTab === "PROFILE" && { backgroundColor: `${theme.colors.primary}18` }]}>
-              <User size={22} color={activeTab === "PROFILE" ? theme.colors.primary : theme.colors.textMuted} />
+              <User size={tabIconSize} color={activeTab === "PROFILE" ? theme.colors.primary : theme.colors.textMuted} />
             </View>
-            <Text style={[styles.navLabel, { color: activeTab === "PROFILE" ? theme.colors.primary : theme.colors.textMuted, fontWeight: activeTab === "PROFILE" ? "700" : "500" }]}>Profile</Text>
+            <Text style={[styles.navLabel, { fontSize: tabLabelSize, color: activeTab === "PROFILE" ? theme.colors.primary : theme.colors.textMuted, fontWeight: activeTab === "PROFILE" ? "700" : "500" }]}>Profile</Text>
           </Pressable>
         </View>
       </View>
@@ -1619,6 +1668,23 @@ const styles = StyleSheet.create({
     borderRadius: 19,
     alignItems: "center" as const,
     justifyContent: "center" as const,
+  },
+  notifBadge: {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    paddingHorizontal: 3,
+  },
+  notifBadgeText: {
+    color: "#ffffff",
+    fontSize: 9,
+    fontWeight: "700" as const,
+    lineHeight: 11,
   },
   homeSearchWrap: {
     paddingHorizontal: 16,

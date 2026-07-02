@@ -18,6 +18,7 @@ export interface UserProfile {
 interface AuthState {
   user: UserProfile | null;
   token: string | null;
+  refreshToken: string | null;
   role: UserRole | null;
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -37,6 +38,7 @@ export const useAuthStore = create<AuthState>()(
     (set, get) => ({
       user: null,
       token: null,
+      refreshToken: null,
       role: null,
       isAuthenticated: false,
       isLoading: false,
@@ -63,6 +65,7 @@ export const useAuthStore = create<AuthState>()(
           set({
             user: userProfile,
             token: res.token,
+            refreshToken: res.refreshToken,
             role: res.user.role,
             isAuthenticated: true,
             isLoading: false,
@@ -84,6 +87,7 @@ export const useAuthStore = create<AuthState>()(
         set({
           user: null,
           token: null,
+          refreshToken: null,
           role: null,
           isAuthenticated: false,
           error: null,
@@ -98,6 +102,7 @@ export const useAuthStore = create<AuthState>()(
       partialize: (state) => ({
         user: state.user,
         token: state.token,
+        refreshToken: state.refreshToken,
         role: state.role,
         isAuthenticated: state.isAuthenticated,
       }),

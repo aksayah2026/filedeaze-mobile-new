@@ -33,7 +33,17 @@ apiClient.interceptors.request.use(
   }
 );
 
-let _logoutPending = false;
+let _isRefreshing = false;
+let _refreshSubscribers: ((token: string) => void)[] = [];
+
+const subscribeTokenRefresh = (cb: (token: string) => void) => {
+  _refreshSubscribers.push(cb);
+};
+
+const onTokenRefreshed = (token: string) => {
+  _refreshSubscribers.forEach((cb) => cb(token));
+  _refreshSubscribers = [];
+};
 
 // Response Interceptor for global error handling
 apiClient.interceptors.response.use(
@@ -42,16 +52,65 @@ apiClient.interceptors.response.use(
     const originalRequest = error.config;
 
     if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-
       const url: string = originalRequest.url || "";
       const isAuthEndpoint = url.includes("/auth/");
-      const { isAuthenticated } = useAuthStore.getState();
 
-      if (isAuthenticated && !isAuthEndpoint && !_logoutPending) {
-        _logoutPending = true;
-        useAuthStore.getState().logout();
-        setTimeout(() => { _logoutPending = false; }, 5000);
+      if (isAuthEndpoint) {
+        return Promise.reject(error);
+      }
+
+      originalRequest._retry = true;
+      const { refreshToken, logout } = useAuthStore.getState();
+
+      if (refreshToken) {
+        if (!_isRefreshing) {
+          _isRefreshing = true;
+          try {
+            const refreshResponse = await axios.post(
+              `${APP_CONFIG.apiBaseUrl}/auth/refresh`,
+              { refreshToken },
+              {
+                headers: {
+                  "Content-Type": "application/json",
+                  Accept: "application/json",
+                  "x-tenant-code": APP_CONFIG.tenantCode,
+                },
+              }
+            );
+
+            const dataObj = refreshResponse.data?.data || refreshResponse.data;
+            const newAccessToken = dataObj?.tokens?.accessToken || dataObj?.accessToken;
+            const newRefreshToken = dataObj?.tokens?.refreshToken || dataObj?.refreshToken;
+
+            if (newAccessToken) {
+              useAuthStore.setState({
+                token: newAccessToken,
+                refreshToken: newRefreshToken || refreshToken,
+              });
+
+              _isRefreshing = false;
+              onTokenRefreshed(newAccessToken);
+            } else {
+              throw new Error("Invalid refresh response");
+            }
+          } catch (refreshErr) {
+            _isRefreshing = false;
+            _refreshSubscribers = [];
+            logout();
+            return Promise.reject(new Error("Your session has expired. Please log in again."));
+          }
+        }
+
+        const retryOrigRequest = new Promise((resolve) => {
+          subscribeTokenRefresh((token) => {
+            originalRequest.headers["Authorization"] = `Bearer ${token}`;
+            resolve(apiClient(originalRequest));
+          });
+        });
+
+        return retryOrigRequest;
+      } else {
+        logout();
         return Promise.reject(new Error("Your session has expired. Please log in again."));
       }
     }

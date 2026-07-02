@@ -57,6 +57,14 @@ export const PaymentCollectionScreen = () => {
   );
   const [extraCharges, setExtraCharges] = useState<{ id: string; name: string; amountStr: string }[]>([]);
   const [transactionId, setTransactionId] = useState("");
+  const [transactionIdError, setTransactionIdError] = useState("");
+
+  const validateTransactionId = (val: string): boolean => {
+    const trimmed = val.trim();
+    if (!trimmed) return false;
+    const regex = /^[a-zA-Z0-9]{8,35}$/;
+    return regex.test(trimmed);
+  };
 
   const addExtraCharge = () => {
     setExtraCharges((prev) => [...prev, { id: Math.random().toString(), name: "", amountStr: "" }]);
@@ -80,12 +88,19 @@ export const PaymentCollectionScreen = () => {
   }, [job, initialAmount, baseAmountStr]);
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
 
+  const base = (!baseAmountStr || isNaN(parseFloat(baseAmountStr)) || parseFloat(baseAmountStr) <= 0) ? 0 : parseFloat(baseAmountStr);
   const percent = 18;
-  const baseAmount = parseFloat(baseAmountStr) || 0;
-  const extraChargesSum = extraCharges.reduce((sum, item) => sum + (parseFloat(item.amountStr) || 0), 0);
-  const totalBase = baseAmount + extraChargesSum;
+  const extraChargesSum = extraCharges.reduce((sum, item) => {
+    const name = item.name.trim();
+    const val = parseFloat(item.amountStr);
+    if (name !== "" && !isNaN(val) && val > 0) {
+      return sum + val;
+    }
+    return sum;
+  }, 0);
+  const totalBase = base + extraChargesSum;
 
-  const gstAmount = Math.round(((totalBase * percent) / 100) * 100) / 100;
+  const gstAmount = base > 0 ? Math.round(((base * percent) / 100) * 100) / 100 : 0;
   const amount = Math.round((totalBase + gstAmount) * 100) / 100;
 
   const upiLink = buildUpiLink(amount);
@@ -95,9 +110,37 @@ export const PaymentCollectionScreen = () => {
       Alert.alert("Amount Required", "Please enter a valid payment amount.");
       return;
     }
-    if (paymentMode === "UPI" && !transactionId.trim()) {
-      Alert.alert("Transaction ID Required", "Please enter the UPI Transaction ID / Ref No.");
-      return;
+
+    // Validate extra charges rows
+    for (const item of extraCharges) {
+      const name = item.name.trim();
+      const val = parseFloat(item.amountStr);
+      const isFullyEmpty = name === "" && item.amountStr.trim() === "";
+      if (isFullyEmpty) {
+        continue;
+      }
+      if (name !== "" && (isNaN(val) || val <= 0)) {
+        Alert.alert("Validation Error", `Please enter a valid amount greater than 0 for extra charge: "${name}"`);
+        return;
+      }
+      if (name === "" && !isNaN(val) && val > 0) {
+        Alert.alert("Validation Error", `Please enter a charge name for the amount: ₹${item.amountStr}`);
+        return;
+      }
+    }
+
+    if (paymentMode === "UPI") {
+      const trimmedTxn = transactionId.trim();
+      if (!trimmedTxn) {
+        setTransactionIdError("Please enter a valid UPI transaction ID.");
+        Alert.alert("Transaction ID Required", "Please enter a valid UPI transaction ID.");
+        return;
+      }
+      if (!validateTransactionId(trimmedTxn)) {
+        setTransactionIdError("Please enter a valid UPI transaction ID.");
+        Alert.alert("Invalid Transaction ID", "Please enter a valid UPI transaction ID.");
+        return;
+      }
     }
     if (!paymentConfirmed) {
       Alert.alert("Confirm Payment", "Please toggle the payment confirmation before submitting.");
@@ -296,7 +339,7 @@ export const PaymentCollectionScreen = () => {
                 Base Service Charge
               </Text>
               <Text style={[styles.breakdownValue, { color: theme.colors.text }]}>
-                ₹{baseAmount.toLocaleString("en-IN")}
+                ₹{base.toLocaleString("en-IN")}
               </Text>
             </View>
 
@@ -436,7 +479,17 @@ export const PaymentCollectionScreen = () => {
             </Text>
             <TextInput
               value={transactionId}
-              onChangeText={setTransactionId}
+              onChangeText={(text) => {
+                setTransactionId(text);
+                const trimmed = text.trim();
+                if (trimmed === "") {
+                  setTransactionIdError("");
+                } else if (!validateTransactionId(text)) {
+                  setTransactionIdError("Please enter a valid UPI transaction ID.");
+                } else {
+                  setTransactionIdError("");
+                }
+              }}
               placeholder="Enter UPI Transaction ID / UTR"
               placeholderTextColor={theme.colors.textLight}
               style={{
@@ -446,10 +499,15 @@ export const PaymentCollectionScreen = () => {
                 paddingHorizontal: 14,
                 fontSize: 15,
                 color: theme.colors.text,
-                borderColor: transactionId.trim() ? theme.colors.primary : theme.colors.border,
+                borderColor: transactionIdError ? theme.colors.danger : (transactionId.trim() ? theme.colors.primary : theme.colors.border),
                 backgroundColor: theme.colors.card,
               }}
             />
+            {transactionIdError ? (
+              <Text style={{ color: theme.colors.danger, fontSize: 12, marginTop: 4 }}>
+                {transactionIdError}
+              </Text>
+            ) : null}
           </View>
         )}
 
@@ -487,7 +545,11 @@ export const PaymentCollectionScreen = () => {
             title="Generate Invoice & Close Job"
             onPress={handleSubmit}
             loading={isLoading2}
-            disabled={!paymentConfirmed || amount <= 0}
+            disabled={
+              !paymentConfirmed ||
+              amount <= 0 ||
+              (paymentMode === "UPI" && (!transactionId.trim() || !!transactionIdError))
+            }
             variant="success"
             size="lg"
             icon={<Receipt size={20} color="#ffffff" />}

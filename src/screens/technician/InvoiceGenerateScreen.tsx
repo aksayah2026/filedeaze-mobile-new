@@ -47,9 +47,11 @@ export const InvoiceGenerateScreen = () => {
 
   // Use real DB values from API; fallback to client-side estimate only if missing
   const baseAmount  = invoiceSubtotal  ?? fallbackBase;
-  const gstAmount   = invoiceGstAmount ?? fallbackGst;
+  const gstAmount   = baseAmount > 0 ? (invoiceGstAmount ?? fallbackGst) : 0;
   const gstPercent  = invoiceGstPercent ?? percent;
-  const totalAmount = invoiceTotal     ?? amount;
+  const totalAmount = baseAmount > 0 
+    ? (invoiceTotal ?? amount) 
+    : (invoiceTotal ? Math.max(0, invoiceTotal - (invoiceGstAmount ?? fallbackGst)) : Math.max(0, amount - fallbackGst));
   const invoiceDate = invoiceGeneratedAt
     ? new Date(invoiceGeneratedAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
     : new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });

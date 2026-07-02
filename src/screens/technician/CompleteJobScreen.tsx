@@ -95,6 +95,14 @@ export const CompleteJobScreen = () => {
   const [amountStr, setAmountStr] = useState("");
   const [extraCharges, setExtraCharges] = useState<{ id: string; name: string; amountStr: string }[]>([]);
   const [transactionId, setTransactionId] = useState("");
+  const [transactionIdError, setTransactionIdError] = useState("");
+
+  const validateTransactionId = (val: string): boolean => {
+    const trimmed = val.trim();
+    if (!trimmed) return false;
+    const regex = /^[a-zA-Z0-9]{8,35}$/;
+    return regex.test(trimmed);
+  };
 
   const addExtraCharge = () => {
     setExtraCharges((prev) => [...prev, { id: Math.random().toString(), name: "", amountStr: "" }]);
@@ -280,11 +288,19 @@ export const CompleteJobScreen = () => {
     setStep(3);
   };
 
-  const baseAmount = parseFloat(amountStr) || 0;
-  const extraChargesSum = extraCharges.reduce((sum, item) => sum + (parseFloat(item.amountStr) || 0), 0);
-  const totalBase = baseAmount + extraChargesSum;
+  const base = (!amountStr || isNaN(parseFloat(amountStr)) || parseFloat(amountStr) <= 0) ? 0 : parseFloat(amountStr);
+  const extraChargesSum = extraCharges.reduce((sum, item) => {
+    const name = item.name.trim();
+    const val = parseFloat(item.amountStr);
+    if (name !== "" && !isNaN(val) && val > 0) {
+      return sum + val;
+    }
+    return sum;
+  }, 0);
+  const totalBase = base + extraChargesSum;
 
-  const gstAmount = Math.round((totalBase * 0.18) * 100) / 100;
+  const gstRate = 0.18;
+  const gstAmount = base > 0 ? Math.round((base * gstRate) * 100) / 100 : 0;
   const amount = Math.round((totalBase + gstAmount) * 100) / 100;
   const upiLink = buildUpiLink(amount);
 
@@ -293,9 +309,37 @@ export const CompleteJobScreen = () => {
       showAlert("Amount Required", "Please enter a valid payment amount.", "warning");
       return;
     }
-    if (paymentMode === "UPI" && !transactionId.trim()) {
-      showAlert("Transaction ID Required", "Please enter the UPI Transaction ID / Ref No.", "warning");
-      return;
+
+    // Validate extra charges rows
+    for (const item of extraCharges) {
+      const name = item.name.trim();
+      const val = parseFloat(item.amountStr);
+      const isFullyEmpty = name === "" && item.amountStr.trim() === "";
+      if (isFullyEmpty) {
+        continue;
+      }
+      if (name !== "" && (isNaN(val) || val <= 0)) {
+        showAlert("Validation Error", `Please enter a valid amount greater than 0 for extra charge: "${name}"`, "warning");
+        return;
+      }
+      if (name === "" && !isNaN(val) && val > 0) {
+        showAlert("Validation Error", `Please enter a charge name for the amount: ₹${item.amountStr}`, "warning");
+        return;
+      }
+    }
+
+    if (paymentMode === "UPI") {
+      const trimmedTxn = transactionId.trim();
+      if (!trimmedTxn) {
+        setTransactionIdError("Please enter a valid UPI transaction ID.");
+        showAlert("Transaction ID Required", "Please enter a valid UPI transaction ID.", "warning");
+        return;
+      }
+      if (!validateTransactionId(trimmedTxn)) {
+        setTransactionIdError("Please enter a valid UPI transaction ID.");
+        showAlert("Invalid Transaction ID", "Please enter a valid UPI transaction ID.", "warning");
+        return;
+      }
     }
     if (!paymentConfirmed) {
       showAlert("Confirm Payment", "Please toggle the payment confirmation before submitting.", "warning");
@@ -304,8 +348,9 @@ export const CompleteJobScreen = () => {
 
     setSubmitting(true);
     try {
-      // 1. Upload all after photos to the backend first
-      for (const uri of afterPhotos) {
+      // 1. Upload all after photos to the backend first (de-duplicated)
+      const uniqueAfterPhotos = Array.from(new Set(afterPhotos));
+      for (const uri of uniqueAfterPhotos) {
         if (!uri.startsWith("http")) {
           await JobService.uploadTicketImage(jobId, uri, "AFTER");
         }
@@ -316,7 +361,7 @@ export const CompleteJobScreen = () => {
         ticketNo: jobId,
         payload: {
           beforePhotos: job?.beforePhotos ?? [],
-          afterPhotos: afterPhotos,
+          afterPhotos: uniqueAfterPhotos,
           customerSignature: "captured",
           workNotes: workNotes + (remarks.trim() ? ` | Customer Remarks: ${remarks}` : "") + (transactionId.trim() ? ` | UPI Txn ID: ${transactionId.trim()}` : ""),
           duration: "—",
@@ -466,7 +511,7 @@ export const CompleteJobScreen = () => {
                   Before Photos (Captured)
                 </Text>
                 <View style={styles.photoRow}>
-                  {beforePhotos.map((uri, i) => (
+                  {Array.from(new Set(beforePhotos)).map((uri, i) => (
                     <Image key={i} source={{ uri }} style={styles.photoThumb} />
                   ))}
                 </View>
@@ -481,7 +526,7 @@ export const CompleteJobScreen = () => {
               Capture work-completed state — showing the resolved issue
             </Text>
             <View style={styles.photoRow}>
-              {afterPhotos.map((uri, i) => (
+              {Array.from(new Set(afterPhotos)).map((uri, i) => (
                 <Pressable
                   key={i}
                   onLongPress={() => setAfterPhotos((p) => p.filter((_, idx) => idx !== i))}
@@ -807,7 +852,7 @@ export const CompleteJobScreen = () => {
                     Base Service Charge
                   </Text>
                   <Text style={[styles.breakdownValue, { color: theme.colors.text }]}>
-                    ₹{baseAmount.toLocaleString("en-IN")}
+                    ₹{base.toLocaleString("en-IN")}
                   </Text>
                 </View>
 
@@ -947,7 +992,17 @@ export const CompleteJobScreen = () => {
                 </Text>
                 <TextInput
                   value={transactionId}
-                  onChangeText={setTransactionId}
+                  onChangeText={(text) => {
+                    setTransactionId(text);
+                    const trimmed = text.trim();
+                    if (trimmed === "") {
+                      setTransactionIdError("");
+                    } else if (!validateTransactionId(text)) {
+                      setTransactionIdError("Please enter a valid UPI transaction ID.");
+                    } else {
+                      setTransactionIdError("");
+                    }
+                  }}
                   placeholder="Enter UPI Transaction ID / UTR"
                   placeholderTextColor={theme.colors.textLight}
                   style={{
@@ -957,10 +1012,15 @@ export const CompleteJobScreen = () => {
                     paddingHorizontal: 14,
                     fontSize: 15,
                     color: theme.colors.text,
-                    borderColor: transactionId.trim() ? theme.colors.primary : theme.colors.border,
+                    borderColor: transactionIdError ? theme.colors.danger : (transactionId.trim() ? theme.colors.primary : theme.colors.border),
                     backgroundColor: theme.colors.card,
                   }}
                 />
+                {transactionIdError ? (
+                  <Text style={{ color: theme.colors.danger, fontSize: 12, marginTop: 4 }}>
+                    {transactionIdError}
+                  </Text>
+                ) : null}
               </View>
             )}
 
@@ -998,7 +1058,11 @@ export const CompleteJobScreen = () => {
                 title="Generate Invoice & Close Job"
                 onPress={handleStep3Submit}
                 loading={isPendingSubmit}
-                disabled={!paymentConfirmed || amount <= 0}
+                disabled={
+                  !paymentConfirmed ||
+                  amount <= 0 ||
+                  (paymentMode === "UPI" && (!transactionId.trim() || !!transactionIdError))
+                }
                 variant="success"
                 size="lg"
                 icon={<Receipt size={20} color="#ffffff" />}
@@ -1020,20 +1084,24 @@ export const CompleteJobScreen = () => {
         message={successMessage}
         onClose={() => {
           setSuccessModalVisible(false);
-          navigation.navigate("InvoiceGenerate", {
-            jobId,
-            ticketNo,
-            amount,
-            paymentMethod: paymentMode,
-            invoiceNo: generatedInvoiceNo || `INV-${ticketNo}`,
-            invoiceSubtotal: totalBase,
-            invoiceGstAmount: gstAmount,
-            invoiceGstPercent: 18,
-            invoiceTotal: amount,
-            invoiceGeneratedAt: new Date().toISOString(),
-          });
+          navigation.navigate("TechnicianHome");
+          // Reset local completion state after navigation
+          setStep(1);
+          setAfterPhotos([]);
+          setWorkNotes("");
+          setGpsCoords(null);
+          setStrokes([]);
+          setCurrentStroke([]);
+          setRemarks("");
+          setHasSigned(false);
+          setPaymentMode("CASH");
+          setAmountStr("");
+          setExtraCharges([]);
+          setTransactionId("");
+          setTransactionIdError("");
+          setPaymentConfirmed(false);
         }}
-        autoCloseDelay={4000}
+        autoCloseDelay={5000}
       />
 
       {/* Custom Alert/Warning Modal */}

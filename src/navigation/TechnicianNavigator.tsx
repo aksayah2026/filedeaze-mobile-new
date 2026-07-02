@@ -24,6 +24,7 @@ import { TravelTrackingScreen } from "../screens/technician/TravelTrackingScreen
 import { WorkTimerScreen } from "../screens/technician/WorkTimerScreen";
 import { InvoiceGenerateScreen } from "../screens/technician/InvoiceGenerateScreen";
 import { PostLoginSplashScreen } from "../screens/auth/PostLoginSplashScreen";
+import { NotificationListScreen } from "../screens/shared/NotificationListScreen";
 
 const Stack = createNativeStackNavigator<TechnicianStackParamList>();
 
@@ -59,6 +60,7 @@ export const TechnicianNavigator = () => {
       <Stack.Screen name="TravelTracking" component={TravelTrackingScreen} />
       <Stack.Screen name="WorkTimer" component={WorkTimerScreen} />
       <Stack.Screen name="InvoiceGenerate" component={InvoiceGenerateScreen} />
+      <Stack.Screen name="NotificationList" component={NotificationListScreen} />
     </Stack.Navigator>
     </ThemeProvider>
   );

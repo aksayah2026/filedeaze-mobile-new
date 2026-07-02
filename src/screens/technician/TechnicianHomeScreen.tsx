@@ -30,11 +30,13 @@ import {
   Calendar,
   Receipt,
   Briefcase,
+  Bell,
 } from "lucide-react-native";
 
 import { useTheme } from "../../theme";
 import { useAuthStore } from "../../store/auth.store";
 import { useTechnicianJobs, useTechnicianInvoices, useAttendanceStatus, useCheckIn, useCheckOut } from "../../hooks/useJobs";
+import { useUnreadNotificationCount } from "../../hooks/useNotifications";
 import { TicketStatus } from "../../services/job.service";
 import { TechnicianStackParamList } from "../../types/navigation.types";
 import { AppLoader } from "../../components/AppLoader";
@@ -71,6 +73,7 @@ export const TechnicianHomeScreen = () => {
 
   const checkInMutation = useCheckIn();
   const checkOutMutation = useCheckOut();
+  const unreadNotifCount = useUnreadNotificationCount();
 
   const [locationModalVisible, setLocationModalVisible] = useState(false);
   const [locationInput, setLocationInput] = useState("Main Office HQ, Sector 62");
@@ -328,6 +331,19 @@ export const TechnicianHomeScreen = () => {
             <Text style={styles.heroMobile}>{user?.mobile}</Text>
           </View>
           <View style={styles.heroActions}>
+            <Pressable
+              onPress={() => navigation.navigate("NotificationList")}
+              style={({ pressed }) => [styles.heroActionBtn, pressed && { opacity: 0.7 }]}
+            >
+              <Bell color="#ffffff" size={18} />
+              {unreadNotifCount > 0 && (
+                <View style={styles.techNotifBadge}>
+                  <Text style={styles.techNotifBadgeText}>
+                    {unreadNotifCount > 9 ? "9+" : unreadNotifCount}
+                  </Text>
+                </View>
+              )}
+            </Pressable>
             <Pressable
               onPress={() => navigation.navigate("AttendanceHistory")}
               style={({ pressed }) => [styles.heroActionBtn, pressed && { opacity: 0.7 }]}
@@ -837,6 +853,24 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.15)",
     justifyContent: "center",
     alignItems: "center",
+  },
+  techNotifBadge: {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: "#ef4444",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 3,
+  },
+  techNotifBadgeText: {
+    color: "#ffffff",
+    fontSize: 9,
+    fontWeight: "700" as const,
+    lineHeight: 11,
   },
   heroBottomRow: {
     flexDirection: "row",

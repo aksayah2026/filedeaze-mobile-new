@@ -28,6 +28,7 @@ export type CustomerStackParamList = {
   InvoiceDetails: { invoiceId: string };
   Feedback: { ticketId: string; ticketNumber: string };
   AddressBook: { onSelectAddress?: (addressText: string, lat: number, lng: number) => void } | undefined;
+  NotificationList: undefined;
 };
 
 export type TechnicianStackParamList = {
@@ -56,6 +57,7 @@ export type TechnicianStackParamList = {
   WorkTimer: { jobId: string; ticketNo: string };
   InvoiceGenerate: { jobId: string; ticketNo: string; amount: number; paymentMethod: string; invoiceNo: string; invoiceSubtotal?: number; invoiceGstAmount?: number; invoiceGstPercent?: number; invoiceTotal?: number; invoiceGeneratedAt?: string };
   ShareInvoice: { jobId: string; ticketNo: string; invoiceNo: string; customerMobile?: string; customerEmail?: string };
+  NotificationList: undefined;
 };
 
 export type RootStackParamList = {

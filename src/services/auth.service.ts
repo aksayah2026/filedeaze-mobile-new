@@ -4,6 +4,7 @@ import { APP_CONFIG } from "../config/app.config";
 export interface LoginResponse {
   success: boolean;
   token: string;
+  refreshToken: string;
   user: {
     id: string;
     name: string;
@@ -51,6 +52,7 @@ export class AuthService {
         handleSuccess({
           success: true,
           token: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
           user: {
             id: user.id,
             name: user.name,
@@ -73,6 +75,7 @@ export class AuthService {
         handleSuccess({
           success: true,
           token: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
           user: {
             id: user.id,
             name: user.name,
@@ -131,6 +134,7 @@ export class AuthService {
       return {
         success: true,
         token: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
         user: {
           id: user.id,
           name: user.name,

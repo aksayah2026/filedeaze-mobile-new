@@ -133,9 +133,9 @@ export function normalizeTicket(raw: any): Ticket {
 
   // Handle images if they exist in raw
   const images = Array.isArray(raw.images) ? raw.images : [];
-  const beforePhotos = images.filter((img: any) => img.type === "BEFORE").map((img: any) => img.imageUrl);
-  const afterPhotos = images.filter((img: any) => img.type === "AFTER").map((img: any) => img.imageUrl);
-  const customerSignature = images.find((img: any) => img.type === "SIGNATURE")?.imageUrl;
+  const beforePhotos = Array.from(new Set(images.filter((img: any) => img.type === "BEFORE").map((img: any) => img.imageUrl as string))) as string[];
+  const afterPhotos = Array.from(new Set(images.filter((img: any) => img.type === "AFTER").map((img: any) => img.imageUrl as string))) as string[];
+  const customerSignature = images.find((img: any) => img.type === "SIGNATURE")?.imageUrl as string | undefined;
 
   return {
     id: raw.id ?? "",
@@ -167,14 +167,14 @@ export function normalizeTicket(raw: any): Ticket {
     scheduledAt: raw.scheduledAt ?? undefined,
     invoiceNo: raw.invoice?.invoiceNumber ?? raw.invoice?.invoiceNo ?? raw.invoiceNo ?? undefined,
     // Real invoice DB fields — populated when invoice is included in the API response
-    invoiceSubtotal:    raw.invoice?.subtotal   != null ? Number(raw.invoice.subtotal)   : undefined,
-    invoiceGstAmount:   raw.invoice?.gstAmount  != null ? Number(raw.invoice.gstAmount)  : undefined,
-    invoiceGstPercent:  raw.invoice?.gstPercent != null ? Number(raw.invoice.gstPercent) : undefined,
-    invoiceTotal:       raw.invoice?.total      != null ? Number(raw.invoice.total)      : undefined,
-    invoiceGeneratedAt: raw.invoice?.generatedAt ? String(raw.invoice.generatedAt)       : undefined,
-    gstEnabled:         raw.gstEnabled ?? false,
-    gstPercent:         raw.gstPercent != null ? Number(raw.gstPercent) : 0,
-    closedAt:           raw.closedAt ? String(raw.closedAt) : undefined,
+    invoiceSubtotal: raw.invoice?.subtotal != null ? Number(raw.invoice.subtotal) : undefined,
+    invoiceGstAmount: raw.invoice?.gstAmount != null ? Number(raw.invoice.gstAmount) : undefined,
+    invoiceGstPercent: raw.invoice?.gstPercent != null ? Number(raw.invoice.gstPercent) : undefined,
+    invoiceTotal: raw.invoice?.total != null ? Number(raw.invoice.total) : undefined,
+    invoiceGeneratedAt: raw.invoice?.generatedAt ? String(raw.invoice.generatedAt) : undefined,
+    gstEnabled: raw.gstEnabled ?? false,
+    gstPercent: raw.gstPercent != null ? Number(raw.gstPercent) : 0,
+    closedAt: raw.closedAt ? String(raw.closedAt) : undefined,
     images: images.map((img: any) => img.imageUrl),
     statusLogs: raw.statusLogs ?? [],
     createdAt: raw.createdAt ?? raw.created_at ?? undefined,
@@ -264,12 +264,12 @@ function normalizeAttendanceRecord(raw: any): AttendanceRecord {
   }
 
   return {
-    id:           raw.id ?? "",
-    date:         dateStr,
+    id: raw.id ?? "",
+    date: dateStr,
     checkInTime,
     checkOutTime,
     workingHours,
-    location:     raw.checkInRemarks ?? raw.location ?? raw.checkInLocation ?? undefined,
+    location: raw.checkInRemarks ?? raw.location ?? raw.checkInLocation ?? undefined,
     status,
   };
 }
@@ -526,17 +526,17 @@ export class JobService {
       checkedIn: dashboard.isCheckedIn === true && !hasCheckedOut,
       checkInTime: dashboard.checkInTime
         ? new Date(dashboard.checkInTime).toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-            timeZone: "Asia/Kolkata",
-          })
+          hour: "2-digit",
+          minute: "2-digit",
+          timeZone: "Asia/Kolkata",
+        })
         : undefined,
       checkOutTime: dashboard.checkOutTime
         ? new Date(dashboard.checkOutTime).toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-            timeZone: "Asia/Kolkata",
-          })
+          hour: "2-digit",
+          minute: "2-digit",
+          timeZone: "Asia/Kolkata",
+        })
         : undefined,
       checkInLocation: "Main Office HQ, Sector 62",
       shiftCompleted: hasCheckedIn && hasCheckedOut,

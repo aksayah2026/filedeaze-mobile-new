@@ -89,14 +89,27 @@ export const InvoiceDetailsScreen = () => {
   };
 
   const generatePDFHtml = (invoice: any, tenant: any) => {
-    const isPaid = invoice.payment?.status === "COLLECTED" || invoice.payment?.status === "PAID";
+    const baseVal = Number(invoice.baseAmount ?? invoice.baseCharges ?? invoice.baseServiceCharge ?? invoice.subtotal ?? 0);
+    const extraVal = Number(invoice.extraChargesTotal ?? invoice.extraCharges ?? 0);
+    const gstVal = baseVal > 0 ? Number(invoice.gstAmount ?? invoice.gst ?? 0) : 0;
+    const rawTotalVal = Number(invoice.totalAmount ?? invoice.grandTotal ?? invoice.total ?? (baseVal + extraVal + gstVal));
+    const totalVal = baseVal > 0 ? rawTotalVal : (rawTotalVal - Number(invoice.gstAmount ?? invoice.gst ?? 0));
+    
+    const payMethod = invoice.paymentMethod ?? invoice.payment?.method ?? "—";
+    const payStatus = invoice.paymentStatus ?? invoice.payment?.status ?? "—";
+    const collAt = invoice.collectedAt ?? invoice.payment?.collectedAt;
+    const invNum = invoice.invoiceNumber ?? invoice.invoiceNo ?? "—";
+    const tktNum = invoice.ticketNumber ?? invoice.ticket?.ticketNumber ?? "—";
+
+    const isPaid = payStatus === "COLLECTED" || payStatus === "PAID" || invoice.payment?.status === "COLLECTED" || invoice.payment?.status === "PAID";
     const gstLabel = invoice.gstPercent > 0 ? `GST (${invoice.gstPercent}%)` : 'GST';
+
     return `
       <!DOCTYPE html>
       <html>
       <head>
         <meta charset="utf-8">
-        <title>Invoice #${invoice.invoiceNumber}</title>
+        <title>Invoice #${invNum}</title>
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background: #f8fafc; padding: 30px; color: #1e293b; }
@@ -147,7 +160,7 @@ export const InvoiceDetailsScreen = () => {
             <div class="meta-grid">
               <div>
                 <div class="meta-label">Invoice Number</div>
-                <div class="meta-value">#${invoice.invoiceNumber}</div>
+                <div class="meta-value">#${invNum}</div>
               </div>
               <div style="text-align:right;">
                 <div class="meta-label">Invoice Date</div>
@@ -155,7 +168,7 @@ export const InvoiceDetailsScreen = () => {
               </div>
               <div>
                 <div class="meta-label">Ticket Number</div>
-                <div class="meta-value">${invoice.ticket?.ticketNumber || "—"}</div>
+                <div class="meta-value">${tktNum}</div>
               </div>
               <div style="text-align:right;">
                 <div class="meta-label">Service</div>
@@ -185,33 +198,42 @@ export const InvoiceDetailsScreen = () => {
                     <strong>${invoice.ticket?.subCategory?.name || "General Service"}</strong><br>
                     <span style="font-size:11px;color:#94a3b8;">${invoice.ticket?.description || invoice.ticket?.subCategory?.category?.name || ""}</span>
                   </td>
-                  <td class="td-right">₹${Number(invoice.subtotal || 0).toLocaleString("en-IN")}</td>
+                  <td class="td-right">₹${baseVal.toLocaleString("en-IN")}</td>
                 </tr>
+                ${extraVal > 0 ? `
+                <tr>
+                  <td>
+                    <strong>Extra Charges / Spares</strong><br>
+                    <span style="font-size:11px;color:#94a3b8;">Additional parts or services</span>
+                  </td>
+                  <td class="td-right">₹${extraVal.toLocaleString("en-IN")}</td>
+                </tr>
+                ` : ""}
               </tbody>
             </table>
 
             <div class="totals-section">
-              <div class="totals-row"><span>Base Charges</span><span>₹${Number(invoice.subtotal || 0).toLocaleString("en-IN")}</span></div>
-              <div class="totals-row"><span>${gstLabel}</span><span>₹${Number(invoice.gstAmount || 0).toLocaleString("en-IN")}</span></div>
-              <div class="totals-row grand"><span>Total Amount</span><span>₹${Number(invoice.total || 0).toLocaleString("en-IN")}</span></div>
+              <div class="totals-row"><span>Base Charges</span><span>₹${baseVal.toLocaleString("en-IN")}</span></div>
+              <div class="totals-row"><span>Extra Charges</span><span>₹${extraVal.toLocaleString("en-IN")}</span></div>
+              <div class="totals-row"><span>${gstLabel}</span><span>₹${gstVal.toLocaleString("en-IN")}</span></div>
+              <div class="totals-row grand"><span>Total Amount</span><span>₹${totalVal.toLocaleString("en-IN")}</span></div>
             </div>
 
-            ${invoice.payment ? `
             <div class="payment-box">
               <div>
                 <div class="payment-label">Payment Method</div>
-                <div class="payment-val">${invoice.payment.method || "—"}</div>
+                <div class="payment-val">${payMethod}</div>
               </div>
               <div style="text-align:right;">
                 <div class="payment-label">Payment Status</div>
-                <div class="payment-val" style="color:${isPaid ? "#059669" : "#d97706"}">${isPaid ? "Collected" : invoice.payment.status}</div>
+                <div class="payment-val" style="color:${isPaid ? "#059669" : "#d97706"}">${isPaid ? "Collected" : payStatus}</div>
               </div>
-              ${invoice.payment.collectedAt ? `
+              ${collAt ? `
               <div style="text-align:right;">
                 <div class="payment-label">Collected At</div>
-                <div class="payment-val">${formatDate(invoice.payment.collectedAt)}</div>
+                <div class="payment-val">${formatDate(collAt)}</div>
               </div>` : ""}
-            </div>` : ""}
+            </div>
 
             <div class="footer">
               Thank you for choosing <strong>${tenant?.companyName || "FieldEaze"}</strong>!<br>
@@ -278,8 +300,45 @@ export const InvoiceDetailsScreen = () => {
     );
   }
 
-  const { invoice, tenant } = invoiceData;
-  const isPaid = invoice.payment?.status === "COLLECTED" || invoice.payment?.status === "PAID";
+  const { invoice: rawInvoice, tenant } = invoiceData;
+  const invoice = rawInvoice as any;
+
+  const baseAmount = Number(
+    invoice.baseAmount ??
+    invoice.baseCharges ??
+    invoice.baseServiceCharge ??
+    invoice.subtotal ??
+    0
+  );
+  
+  const extraCharges = Number(
+    invoice.extraChargesTotal ??
+    invoice.extraCharges ??
+    0
+  );
+  
+  const gstAmount = baseAmount > 0 ? Number(
+    invoice.gstAmount ??
+    invoice.gst ??
+    0
+  ) : 0;
+  
+  const rawTotal = Number(
+    invoice.totalAmount ??
+    invoice.grandTotal ??
+    invoice.total ??
+    (baseAmount + extraCharges + gstAmount)
+  );
+
+  const totalAmount = baseAmount > 0 ? rawTotal : (rawTotal - Number(invoice.gstAmount ?? invoice.gst ?? 0));
+
+  const paymentMethod = invoice.paymentMethod ?? invoice.payment?.method ?? "—";
+  const paymentStatus = invoice.paymentStatus ?? invoice.payment?.status ?? "—";
+  const collectedAt = invoice.collectedAt ?? invoice.payment?.collectedAt;
+  const invoiceNumber = invoice.invoiceNumber ?? invoice.invoiceNo ?? "—";
+  const ticketNumber = invoice.ticketNumber ?? invoice.ticket?.ticketNumber ?? "—";
+
+  const isPaid = paymentStatus === "COLLECTED" || paymentStatus === "PAID" || invoice.payment?.status === "COLLECTED" || invoice.payment?.status === "PAID";
   const paymentStatusColor = isPaid ? theme.colors.success : theme.colors.warning;
 
   return (
@@ -313,7 +372,7 @@ export const InvoiceDetailsScreen = () => {
                 <Clock size={13} color={paymentStatusColor} style={{ marginRight: 4 }} />
               )}
               <Text style={[styles.paidText, { color: paymentStatusColor }]}>
-                {isPaid ? "PAID" : (invoice.payment?.status || "PENDING")}
+                {isPaid ? "PAID" : (paymentStatus || "PENDING")}
               </Text>
             </View>
           </View>
@@ -324,7 +383,7 @@ export const InvoiceDetailsScreen = () => {
           <View style={styles.metaGrid}>
             <View>
               <Text style={[styles.metaLabel, { color: theme.colors.textMuted }]}>INVOICE NUMBER</Text>
-              <Text style={[styles.metaValue, { color: theme.colors.text }]}>#{invoice.invoiceNumber}</Text>
+              <Text style={[styles.metaValue, { color: theme.colors.text }]}>#{invoiceNumber}</Text>
             </View>
             <View style={{ alignItems: "flex-end" }}>
               <Text style={[styles.metaLabel, { color: theme.colors.textMuted }]}>DATE</Text>
@@ -336,7 +395,7 @@ export const InvoiceDetailsScreen = () => {
             <View>
               <Text style={[styles.metaLabel, { color: theme.colors.textMuted }]}>TICKET NUMBER</Text>
               <Text style={[styles.metaValue, { color: theme.colors.text }]}>
-                {invoice.ticket?.ticketNumber || "—"}
+                {ticketNumber}
               </Text>
             </View>
             <View style={{ alignItems: "flex-end" }}>
@@ -366,7 +425,7 @@ export const InvoiceDetailsScreen = () => {
               )}
             </View>
             <Text style={[styles.itemPrice, { color: theme.colors.text }]}>
-              ₹{Number(invoice.subtotal || 0).toLocaleString("en-IN")}
+              ₹{baseAmount.toLocaleString("en-IN")}
             </Text>
           </View>
 
@@ -397,7 +456,13 @@ export const InvoiceDetailsScreen = () => {
             <View style={styles.totalRow}>
               <Text style={[styles.totalLabel, { color: theme.colors.textMuted }]}>Base Charges</Text>
               <Text style={[styles.totalVal, { color: theme.colors.text }]}>
-                ₹{Number(invoice.subtotal || 0).toLocaleString("en-IN")}
+                ₹{baseAmount.toLocaleString("en-IN")}
+              </Text>
+            </View>
+            <View style={[styles.totalRow, { marginTop: 8 }]}>
+              <Text style={[styles.totalLabel, { color: theme.colors.textMuted }]}>Extra Charges</Text>
+              <Text style={[styles.totalVal, { color: theme.colors.text }]}>
+                ₹{extraCharges.toLocaleString("en-IN")}
               </Text>
             </View>
             <View style={[styles.totalRow, { marginTop: 8 }]}>
@@ -405,20 +470,20 @@ export const InvoiceDetailsScreen = () => {
                 {invoice.gstPercent > 0 ? `GST (${invoice.gstPercent}%)` : 'GST'}
               </Text>
               <Text style={[styles.totalVal, { color: theme.colors.text }]}>
-                ₹{Number(invoice.gstAmount || 0).toLocaleString("en-IN")}
+                ₹{gstAmount.toLocaleString("en-IN")}
               </Text>
             </View>
             <View style={[styles.divider, { backgroundColor: theme.colors.borderLight }]} />
             <View style={styles.totalRow}>
               <Text style={[styles.grandTotalLabel, { color: theme.colors.text }]}>Total Amount</Text>
               <Text style={[styles.grandTotalVal, { color: theme.colors.primary }]}>
-                ₹{Number(invoice.total || 0).toLocaleString("en-IN")}
+                ₹{totalAmount.toLocaleString("en-IN")}
               </Text>
             </View>
           </View>
 
           {/* Payment Info */}
-          {invoice.payment && (
+          {(invoice.payment || paymentMethod !== "—") && (
             <>
               <View style={[styles.divider, { backgroundColor: theme.colors.borderLight }]} />
               <Text style={[styles.sectionHeading, { color: theme.colors.textMuted }]}>PAYMENT DETAILS</Text>
@@ -428,7 +493,7 @@ export const InvoiceDetailsScreen = () => {
                   <View style={styles.methodRow}>
                     <CreditCard size={13} color={theme.colors.primary} style={{ marginRight: 5 }} />
                     <Text style={[styles.metaValue, { color: theme.colors.text }]}>
-                      {invoice.payment.method || "—"}
+                      {paymentMethod}
                     </Text>
                   </View>
                 </View>
@@ -436,17 +501,17 @@ export const InvoiceDetailsScreen = () => {
                   <Text style={[styles.metaLabel, { color: theme.colors.textMuted }]}>STATUS</Text>
                   <View style={[styles.statusPill, { backgroundColor: `${paymentStatusColor}15` }]}>
                     <Text style={[styles.statusPillText, { color: paymentStatusColor }]}>
-                      {isPaid ? "✓ Collected" : invoice.payment.status}
+                      {isPaid ? "✓ Collected" : paymentStatus}
                     </Text>
                   </View>
                 </View>
               </View>
-              {invoice.payment.collectedAt && (
+              {collectedAt && (
                 <View style={[styles.metaGrid, { marginTop: 10 }]}>
                   <View>
                     <Text style={[styles.metaLabel, { color: theme.colors.textMuted }]}>COLLECTED AT</Text>
                     <Text style={[styles.metaValueSm, { color: theme.colors.text }]}>
-                      {formatDateTime(invoice.payment.collectedAt)}
+                      {formatDateTime(collectedAt)}
                     </Text>
                   </View>
                 </View>
